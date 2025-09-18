@@ -1136,7 +1136,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
             FilledButton.icon(onPressed: _toggleLinkMode, icon: Icon(linkMode ? Icons.link_off : Icons.link), label: Text(linkMode ? 'Link-Modus AUS' : 'Link-Modus EIN')),
             const SizedBox(width: 16),
             const Text('px/Tag'),
-            Slider(value: pxPerDay, min: 4, max: 120, onChanged: (v) => setState(() => pxPerDay = v)),
+            Slider(value: pxPerDay, min: 4, max: 40, onChanged: (v) => setState(() => pxPerDay = v)),
             const SizedBox(width: 8),
             OutlinedButton.icon(onPressed: _openTimeRangeDialog, icon: const Icon(Icons.date_range), label: const Text('Zeitraum')),
             const SizedBox(width: 8),
