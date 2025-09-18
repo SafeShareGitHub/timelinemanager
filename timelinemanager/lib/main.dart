@@ -337,7 +337,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     final days = ((x - 140) / pxPerDay).round();
     return origin.add(Duration(days: days));
   }
-  double snapLane(double y) => (y / 80).round().clamp(1, (canvasHeight - 60) ~/ 80).toDouble() * 80;
+  //double snapLane(double y) => (y / 80).round().clamp(1, (canvasHeight - 60) ~/ 80).toDouble() * 80;
 
   Offset? positionOfId(String id, {int depth = 0}) {
     final Artifact? a = artifacts.firstWhereOrNull((x) => x.id == id);
@@ -1290,7 +1290,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                       onDoubleTap: () => _editArtifact(a),
                       onPanStart: (_) { _dragPosOverride[a.id] = basePos; setState(() {}); },
                       onPanUpdate: (d) { final prev = _dragPosOverride[a.id] ?? basePos; final next = Offset(prev.dx + d.delta.dx, (prev.dy + d.delta.dy).clamp(60, canvasHeight - 40)); _dragPosOverride[a.id] = next; setState(() {}); },
-                      onPanEnd: (_) { final endPos = _dragPosOverride[a.id] ?? basePos; setState(() { a.date = dateForX(endPos.dx); a.y = snapLane(endPos.dy); _dragPosOverride.remove(a.id); }); _pushHistory(); },
+                      onPanEnd: (_) { final endPos = _dragPosOverride[a.id] ?? basePos; setState(() { a.date = dateForX(endPos.dx); a.y = endPos.dy; _dragPosOverride.remove(a.id); }); _pushHistory(); },
                       child: Opacity(
                         opacity: opacity,
                         child: AnimatedContainer(
