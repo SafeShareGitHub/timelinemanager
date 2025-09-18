@@ -88598,7 +88598,7 @@ if(m.k2)e.push(A.aw5(0,A.it(A.ja(l,l,B.v,B.q,l,l,l,l,l,l,l,l,l),!0,l)))
 f=A.V(h)
 B.b.X(e,new A.d7(new A.ap(h,new A.as9(m),f.i("ap<1>")),new A.asa(m),f.i("d7<1,e>")))
 B.b.X(e,new A.a8(i,new A.as2(m),A.V(i).i("a8<1,e>")))
-j=A.ip(new A.yv(A.c8(A.jM(B.cx,e,B.A,B.bS,l),760,140+k*j+200),!1,2.5,0.5,l),1)
+j=A.ip(new A.yv(A.c8(A.jM(B.cx,e,B.A,B.bS,l),1760,140+k*j+200),!1,2.5,0.5,l),1)
 e=A.D(a0).ax
 f=e.R8
 if(f==null)f=e.k2
@@ -89844,7 +89844,7 @@ A.arT.prototype={
 $1(a){var s,r=this.a,q=r.k4,p=this.b.a,o=q.h(0,p)
 if(o==null)o=this.c
 s=a.d
-q.t(0,p,new A.f(o.a+s.a,B.d.dJ(o.b+s.b,60,720)))
+q.t(0,p,new A.f(o.a+s.a,B.d.dJ(o.b+s.b,60,1720)))
 r.N(new A.arH())},
 $S:13}
 A.arH.prototype={
