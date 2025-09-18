@@ -183,7 +183,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
   DateTime origin = DateTime.now().subtract(const Duration(days: 90));
   DateTime endDate = DateTime.now().add(const Duration(days: 30));
   double pxPerDay = 24; // zoom factor
-  double canvasHeight = 760;
+  double canvasHeight = 1760;
 
   // Band layout config
   bool bandStackMode = false;
