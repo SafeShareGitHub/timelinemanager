@@ -57,7 +57,7 @@ class ArtifactType {
 }
 
 class Artifact {
-  String id;
+  final String id;
   String name;
   String type;
   String owner;
@@ -72,7 +72,7 @@ class Artifact {
   List<String> eventIds;  // milestones
 
   Artifact({
-    required this.id,
+    String? id, // optional, wird generiert wenn null
     required this.name,
     required this.type,
     required this.owner,
@@ -84,7 +84,8 @@ class Artifact {
     List<String>? outputs,
     List<String>? bandIds,
     List<String>? eventIds,
-  })  : inputs = inputs ?? [],
+  })  : id = id ?? UniqueKey().toString(),
+        inputs = inputs ?? [],
         outputs = outputs ?? [],
         bandIds = bandIds ?? [],
         eventIds = eventIds ?? [];
@@ -103,8 +104,9 @@ class Artifact {
         'bandIds': bandIds,
         'eventIds': eventIds,
       };
+
   static Artifact fromJson(Map<String, dynamic> j) => Artifact(
-        id: j['id'],
+        id: j['id'], // nimmt vorhandene ID, oder generiert im Konstruktor eine neue
         name: j['name'],
         type: j['type'],
         owner: j['owner'] ?? '',
@@ -118,7 +120,6 @@ class Artifact {
         eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
       );
 }
-
 class Link {
   String id;
   String fromId; // Artifact.id or Link.id
@@ -371,35 +372,35 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     });
     _pushHistory();
   }
+int focusDepth = 1; // Anzahl Ebenen links/rechts, die sichtbar sind
 
-  /// BFS über Links beidseitig, liefert verbundene Artefakt- und Link-IDs
-  (Set<String>, Set<String>) _computeConnected(String startId) {
-    final artSet = <String>{startId};
-    final linkSet = <String>{};
-    final q = <String>[startId];
+(Set<String>, Set<String>) _computeConnected(String startId, {int maxDepth = 1}) {
+  final artSet = <String>{startId};
+  final linkSet = <String>{};
+  final q = <(String, int)>[(startId, 0)];
 
-    final byFrom = <String, List<Link>>{};
-    final byTo = <String, List<Link>>{};
-    for (final l in links) {
-      (byFrom[l.fromId] ??= []).add(l);
-      (byTo[l.toId] ??= []).add(l);
-    }
-
-    while (q.isNotEmpty) {
-      final cur = q.removeAt(0);
-      // Ausgehende
-      for (final l in byFrom[cur] ?? const []) {
-        linkSet.add(l.id);
-        if (artSet.add(l.toId)) q.add(l.toId);
-      }
-      // Eingehende
-      for (final l in byTo[cur] ?? const []) {
-        linkSet.add(l.id);
-        if (artSet.add(l.fromId)) q.add(l.fromId);
-      }
-    }
-    return (artSet, linkSet);
+  final byFrom = <String, List<Link>>{};
+  final byTo = <String, List<Link>>{};
+  for (final l in links) {
+    (byFrom[l.fromId] ??= []).add(l);
+    (byTo[l.toId] ??= []).add(l);
   }
+
+  while (q.isNotEmpty) {
+    final (cur, depth) = q.removeAt(0);
+    if (depth >= maxDepth) continue;
+
+    for (final l in byFrom[cur] ?? const []) {
+      linkSet.add(l.id);
+      if (artSet.add(l.toId)) q.add((l.toId, depth + 1));
+    }
+    for (final l in byTo[cur] ?? const []) {
+      linkSet.add(l.id);
+      if (artSet.add(l.fromId)) q.add((l.fromId, depth + 1));
+    }
+  }
+  return (artSet, linkSet);
+}
 
   // IO helpers (links)
   List<String> _inboundOf(String id) =>
@@ -449,7 +450,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
   bool visibleArtifact(Artifact a) {
     final typeOk = typeFilter == null || a.type == typeFilter;
-    final text = '${a.id} ${a.name} ${a.owner} ${a.documentId}'.toLowerCase();
+    final text = '${a.name} ${a.owner} ${a.documentId}'.toLowerCase();
     final searchOk = search.isEmpty || text.contains(search.toLowerCase());
     final unlinkedOk = !showOnlyUnlinked || !links.any((l) => l.fromId == a.id || l.toId == a.id);
     final membershipOk = _passesMembershipFilters(a);
@@ -610,6 +611,49 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
       ),
     );
   }
+
+void _openFocusDepthDialog() async {
+  int tempDepth = focusDepth;
+  await showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Fokus-Tiefe einstellen'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Wie viele Nachbar-Ebenen anzeigen?'),
+          Slider(
+            value: tempDepth.toDouble(),
+            min: 1,
+            max: 5,
+            divisions: 4,
+            label: '$tempDepth',
+            onChanged: (v) => setState(() => tempDepth = v.round()),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+        FilledButton(
+          onPressed: () {
+            setState(() {
+              focusDepth = tempDepth;
+              if (focusArtifactId != null) {
+                final res = _computeConnected(focusArtifactId!, maxDepth: focusDepth);
+                _focusedArtifactIds = res.$1;
+                _focusedLinkIds = res.$2;
+              }
+            });
+            Navigator.pop(ctx);
+            _pushHistory();
+          },
+          child: const Text('Übernehmen'),
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _yearField(String label, int value, Function(String) onChanged) => TextField(
         controller: TextEditingController(text: '$value'),
@@ -1111,6 +1155,12 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
           IconButton(tooltip: 'Filter (Phasen/Events)', onPressed: _openFilterDialog, icon: const Icon(Icons.filter_alt_outlined)),
           IconButton(tooltip: 'Jahresfilter', onPressed: _openYearFilterDialog, icon: const Icon(Icons.calendar_month_outlined)),
           const SizedBox(width: 6),
+          IconButton(
+  tooltip: 'Fokus-Tiefe einstellen',
+  onPressed: _openFocusDepthDialog,
+  icon: const Icon(Icons.settings_input_component),
+),
+
           IconButton(
             tooltip: 'Fokus löschen',
             onPressed: focusArtifactId != null ? () => _setFocus(null) : null,
