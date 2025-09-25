@@ -57,7 +57,7 @@ class ArtifactType {
 }
 
 class Artifact {
-  final String id;
+  final String id; // internal only, never shown or exported
   String name;
   String type;
   String owner;
@@ -65,14 +65,13 @@ class Artifact {
   DateTime date;
   double y;
   String notes;
-  List<String> inputs;  // kept in sync with inbound selections
-  List<String> outputs; // kept in sync with outbound selections
-  // memberships
-  List<String> bandIds;   // phases
-  List<String> eventIds;  // milestones
+  List<String> inputs;
+  List<String> outputs;
+  List<String> bandIds;
+  List<String> eventIds;
 
   Artifact({
-    String? id, // optional, wird generiert wenn null
+    String? id,
     required this.name,
     required this.type,
     required this.owner,
@@ -91,7 +90,7 @@ class Artifact {
         eventIds = eventIds ?? [];
 
   Map<String, dynamic> toJson() => {
-        'id': id,
+        // 'id': id,   // 🚫 no longer exported
         'name': name,
         'type': type,
         'owner': owner,
@@ -106,7 +105,7 @@ class Artifact {
       };
 
   static Artifact fromJson(Map<String, dynamic> j) => Artifact(
-        id: j['id'], // nimmt vorhandene ID, oder generiert im Konstruktor eine neue
+        // id: j['id'], 🚫 ignore id from JSON
         name: j['name'],
         type: j['type'],
         owner: j['owner'] ?? '',
@@ -120,6 +119,7 @@ class Artifact {
         eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
       );
 }
+
 class Link {
   String id;
   String fromId; // Artifact.id or Link.id
@@ -664,7 +664,7 @@ void _openFocusDepthDialog() async {
 
   void _startNewArtifactDialog() async {
     final nameC = TextEditingController();
-    final idC = TextEditingController();
+    //final idC = TextEditingController();
     final ownerC = TextEditingController();
     final docC = TextEditingController();
     final notesC = TextEditingController();
@@ -686,7 +686,7 @@ void _openFocusDepthDialog() async {
           child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
               TextField(controller: nameC, decoration: const InputDecoration(labelText: 'Name')),
-              TextField(controller: idC, decoration: const InputDecoration(labelText: 'ID (z. B. R-123)')),
+              //TextField(controller: idC, decoration: const InputDecoration(labelText: 'ID (z. B. R-123)')),
               _typeDropdown(type, (v) => type = v ?? type),
               Row(children: [
                 const Text('Datum:'), const SizedBox(width: 12),
@@ -745,9 +745,9 @@ void _openFocusDepthDialog() async {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
           FilledButton(onPressed: () {
-            if (nameC.text.trim().isEmpty || idC.text.trim().isEmpty) return;
+           // if (nameC.text.trim().isEmpty || idC.text.trim().isEmpty) return;
             final newArt = Artifact(
-              id: idC.text.trim(), name: nameC.text.trim(), type: type,
+              id: UniqueKey().toString(), name: nameC.text.trim(), type: type,
               owner: ownerC.text.trim(), documentId: docC.text.trim(),
               date: date, y: 120 + (artifacts.length % 6) * 80,
               notes: notesC.text.trim(),
@@ -1348,7 +1348,7 @@ void _openFocusDepthDialog() async {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                           decoration: BoxDecoration(color: selected ? t.color.withOpacity(0.95) : t.color.withOpacity(0.88), borderRadius: BorderRadius.circular(18), boxShadow: const [BoxShadow(blurRadius: 6, offset: Offset(0, 2), color: Color(0x22000000))], border: Border.all(color: focusArtifactId == a.id ? Colors.yellowAccent : Colors.white, width: focusArtifactId == a.id ? 2.2 : 1.2)),
                           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('${a.id} · ${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                            Text('${a.name}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                             Row(children: [
                               Text(a.owner.isEmpty ? '' : a.owner, style: const TextStyle(color: Colors.white, fontSize: 11)),
                               if (a.documentId.isNotEmpty) ...[ const SizedBox(width: 6), Text(a.documentId, style: const TextStyle(color: Colors.white70, fontSize: 10)), ]
