@@ -19,6 +19,8 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'focus_depth_dialog.dart';
+
 
 void main() => runApp(const TraceabilityApp());
 
@@ -166,6 +168,9 @@ class TraceabilityHome extends StatefulWidget {
 enum FilterMode { ignore, showOnly, hideSelected }
 
 class _TraceabilityHomeState extends State<TraceabilityHome> {
+
+
+
   // State
   final List<Artifact> artifacts = [];
   final List<Link> links = [];
@@ -612,47 +617,7 @@ int focusDepth = 1; // Anzahl Ebenen links/rechts, die sichtbar sind
     );
   }
 
-void _openFocusDepthDialog() async {
-  int tempDepth = focusDepth;
-  await showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Fokus-Tiefe einstellen'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Wie viele Nachbar-Ebenen anzeigen?'),
-          Slider(
-            value: tempDepth.toDouble(),
-            min: 1,
-            max: 5,
-            divisions: 4,
-            label: '$tempDepth',
-            onChanged: (v) => setState(() => tempDepth = v.round()),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
-        FilledButton(
-          onPressed: () {
-            setState(() {
-              focusDepth = tempDepth;
-              if (focusArtifactId != null) {
-                final res = _computeConnected(focusArtifactId!, maxDepth: focusDepth);
-                _focusedArtifactIds = res.$1;
-                _focusedLinkIds = res.$2;
-              }
-            });
-            Navigator.pop(ctx);
-            _pushHistory();
-          },
-          child: const Text('Übernehmen'),
-        ),
-      ],
-    ),
-  );
-}
+
 
 
   Widget _yearField(String label, int value, Function(String) onChanged) => TextField(
@@ -1155,10 +1120,22 @@ void _openFocusDepthDialog() async {
           IconButton(tooltip: 'Filter (Phasen/Events)', onPressed: _openFilterDialog, icon: const Icon(Icons.filter_alt_outlined)),
           IconButton(tooltip: 'Jahresfilter', onPressed: _openYearFilterDialog, icon: const Icon(Icons.calendar_month_outlined)),
           const SizedBox(width: 6),
-          IconButton(
-  tooltip: 'Fokus-Tiefe einstellen',
-  onPressed: _openFocusDepthDialog,
-  icon: const Icon(Icons.settings_input_component),
+          IconButton(  tooltip: 'Fokus-Tiefe einstellen',  onPressed: () async {
+  final result = await showFocusDepthDialog(context, focusDepth);
+  // or: final result = await FocusDepthDialog.show(context, initialDepth: focusDepth);
+  if (result != null) {
+    setState(() {
+      focusDepth = result;
+      if (focusArtifactId != null) {
+        final res = _computeConnected(focusArtifactId!, maxDepth: focusDepth);
+        _focusedArtifactIds = res.$1;
+        _focusedLinkIds = res.$2;
+      }
+    });
+    _pushHistory();
+  }
+}
+,  icon: const Icon(Icons.settings_input_component),
 ),
 
           IconButton(
