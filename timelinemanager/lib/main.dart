@@ -47,6 +47,13 @@ class TraceabilityHome extends StatefulWidget {
 
 enum FilterMode { ignore, showOnly, hideSelected }
 
+enum ArtifactFilter {
+  none, // no filter
+  unlinked, // show only unlinked
+  liegtVorOff, // show only artifacts where liegtVor == false
+  klarOff, // show only artifacts where klar == false
+}
+
 class _TraceabilityHomeState extends State<TraceabilityHome> {
   // State
   final List<Artifact> artifacts = [];
@@ -76,7 +83,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
   // Filters
   String? typeFilter;
-  bool showOnlyUnlinked = false;
+  ArtifactFilter artifactFilter = ArtifactFilter.none;
   String search = '';
   bool dimFiltered = false;
 
@@ -249,7 +256,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     'selectedEventIds': selectedEventIds.toList(),
     'filterMode': filterMode.index,
     'typeFilter': typeFilter,
-    'showOnlyUnlinked': showOnlyUnlinked,
+    //'showOnlyUnlinked': showOnlyUnlinked,
     'search': search,
     'dimFiltered': dimFiltered,
     'focusArtifactId': focusArtifactId,
@@ -311,7 +318,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
       );
     filterMode = FilterMode.values[(map['filterMode'] ?? 0).toInt()];
     typeFilter = map['typeFilter'];
-    showOnlyUnlinked = map['showOnlyUnlinked'] ?? false;
+    //showOnlyUnlinked = map['showOnlyUnlinked'] ?? false;
     search = map['search'] ?? '';
     dimFiltered = map['dimFiltered'] ?? false;
 
@@ -505,9 +512,22 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     final typeOk = typeFilter == null || a.type == typeFilter;
     final text = '${a.name} ${a.owner} ${a.documentId}'.toLowerCase();
     final searchOk = search.isEmpty || text.contains(search.toLowerCase());
-    final unlinkedOk =
-        !showOnlyUnlinked ||
-        !links.any((l) => l.fromId == a.id || l.toId == a.id);
+    bool filterOk = true;
+    switch (artifactFilter) {
+      case ArtifactFilter.none:
+        filterOk = true;
+        break;
+      case ArtifactFilter.unlinked:
+        filterOk = !links.any((l) => l.fromId == a.id || l.toId == a.id);
+        break;
+      case ArtifactFilter.liegtVorOff:
+        filterOk = a.liegtVor == false;
+        break;
+      case ArtifactFilter.klarOff:
+        filterOk = a.klar == false;
+        break;
+    }
+
     final membershipOk = _passesMembershipFilters(a);
     final inYearWindow = !a.date.isBefore(origin) && !a.date.isAfter(endDate);
 
@@ -518,7 +538,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
         return false; // hide
       }
     }
-    return typeOk && searchOk && unlinkedOk && membershipOk && inYearWindow;
+    return typeOk && searchOk && filterOk && membershipOk && inYearWindow;
   }
 
   bool visibleLink(Link l) {
@@ -2373,12 +2393,36 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                   onChanged: (v) => setState(() => typeFilter = v),
                 ),
                 const SizedBox(width: 8),
-                Checkbox(
-                  value: showOnlyUnlinked,
-                  onChanged: (v) =>
-                      setState(() => showOnlyUnlinked = v ?? false),
+                DropdownButton<ArtifactFilter>(
+                  value: artifactFilter,
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() {
+                        artifactFilter = v;
+                        _pushHistory();
+                      });
+                    }
+                  },
+                  items: const [
+                    DropdownMenuItem(
+                      value: ArtifactFilter.none,
+                      child: Text('Alle anzeigen'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.unlinked,
+                      child: Text('Nur unverlinkte'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.liegtVorOff,
+                      child: Text('Nur liegtVor = false'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.klarOff,
+                      child: Text('Nur klar = false'),
+                    ),
+                  ],
                 ),
-                const Text('nur Unverlinkte'),
+
                 const SizedBox(width: 8),
                 Checkbox(
                   value: dimFiltered,
