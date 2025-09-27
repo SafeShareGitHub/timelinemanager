@@ -2596,7 +2596,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${a.id} · ${a.name}',
+                                    '${a.name}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
