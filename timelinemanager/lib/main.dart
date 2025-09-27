@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:timelinemanager/classes/artifact.dart';
+import 'package:timelinemanager/classes/link.dart';
+import 'package:timelinemanager/classes/timeband.dart';
 
 void main() => runApp(const TraceabilityApp());
 
@@ -35,66 +37,6 @@ List<String> _splitList(String s) =>
     s.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
 // ----------------------------- Data Models ---------------------------------
-
-class Link {
-  String id;
-  String fromId; // Artifact.id or Link.id
-  String toId; // Artifact.id or Link.id
-  String label;
-  Link({
-    required this.id,
-    required this.fromId,
-    required this.toId,
-    this.label = '',
-  });
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'fromId': fromId,
-    'toId': toId,
-    'label': label,
-  };
-  static Link fromJson(Map<String, dynamic> j) => Link(
-    id: j['id'],
-    fromId: j['fromId'],
-    toId: j['toId'],
-    label: j['label'] ?? '',
-  );
-}
-
-class TimeBand {
-  // phases (bottom)
-  String id;
-  String label;
-  int colorValue;
-  String type;
-  DateTime start;
-  DateTime end;
-  TimeBand({
-    required this.id,
-    required this.label,
-    required Color color,
-    required this.type,
-    required this.start,
-    required this.end,
-  }) : colorValue = color.value;
-  Color get color => Color(colorValue);
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'label': label,
-    'color': colorValue,
-    'type': type,
-    'start': start.toIso8601String(),
-    'end': end.toIso8601String(),
-  };
-  static TimeBand fromJson(Map<String, dynamic> j) => TimeBand(
-    id: j['id'],
-    label: j['label'],
-    color: Color(j['color']),
-    type: j['type'] ?? '',
-    start: DateTime.parse(j['start']),
-    end: DateTime.parse(j['end']),
-  );
-}
 
 // dated milestone pin
 class TimeEvent {
