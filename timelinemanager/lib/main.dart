@@ -47,6 +47,13 @@ class TraceabilityHome extends StatefulWidget {
 
 enum FilterMode { ignore, showOnly, hideSelected }
 
+enum ArtifactFilter {
+  none, // no filter
+  unlinked, // show only unlinked
+  liegtVorOff, // show only artifacts where liegtVor == false
+  klarOff, // show only artifacts where klar == false
+}
+
 class _TraceabilityHomeState extends State<TraceabilityHome> {
   // State
   final List<Artifact> artifacts = [];
@@ -76,7 +83,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
   // Filters
   String? typeFilter;
-  bool showOnlyUnlinked = false;
+  ArtifactFilter artifactFilter = ArtifactFilter.none;
   String search = '';
   bool dimFiltered = false;
 
@@ -249,7 +256,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     'selectedEventIds': selectedEventIds.toList(),
     'filterMode': filterMode.index,
     'typeFilter': typeFilter,
-    'showOnlyUnlinked': showOnlyUnlinked,
+    //'showOnlyUnlinked': showOnlyUnlinked,
     'search': search,
     'dimFiltered': dimFiltered,
     'focusArtifactId': focusArtifactId,
@@ -311,7 +318,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
       );
     filterMode = FilterMode.values[(map['filterMode'] ?? 0).toInt()];
     typeFilter = map['typeFilter'];
-    showOnlyUnlinked = map['showOnlyUnlinked'] ?? false;
+    //showOnlyUnlinked = map['showOnlyUnlinked'] ?? false;
     search = map['search'] ?? '';
     dimFiltered = map['dimFiltered'] ?? false;
 
@@ -505,9 +512,22 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     final typeOk = typeFilter == null || a.type == typeFilter;
     final text = '${a.name} ${a.owner} ${a.documentId}'.toLowerCase();
     final searchOk = search.isEmpty || text.contains(search.toLowerCase());
-    final unlinkedOk =
-        !showOnlyUnlinked ||
-        !links.any((l) => l.fromId == a.id || l.toId == a.id);
+    bool filterOk = true;
+    switch (artifactFilter) {
+      case ArtifactFilter.none:
+        filterOk = true;
+        break;
+      case ArtifactFilter.unlinked:
+        filterOk = !links.any((l) => l.fromId == a.id || l.toId == a.id);
+        break;
+      case ArtifactFilter.liegtVorOff:
+        filterOk = a.liegtVor == false;
+        break;
+      case ArtifactFilter.klarOff:
+        filterOk = a.klar == false;
+        break;
+    }
+
     final membershipOk = _passesMembershipFilters(a);
     final inYearWindow = !a.date.isBefore(origin) && !a.date.isAfter(endDate);
 
@@ -518,7 +538,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
         return false; // hide
       }
     }
-    return typeOk && searchOk && unlinkedOk && membershipOk && inYearWindow;
+    return typeOk && searchOk && filterOk && membershipOk && inYearWindow;
   }
 
   bool visibleLink(Link l) {
@@ -894,249 +914,30 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     final chosenEvents = <String>{};
 
     // IO selections (via chips)
-    final inboundSel = <String>{}; // artifacts that flow into THIS
-    final outboundSel = <String>{}; // artifacts that THIS flows into
+    final inboundSel = <String>{};
+    final outboundSel = <String>{};
+
+    // NEW: checkbox states
+    bool klar = false;
+    bool liegtVor = false;
 
     await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Neues Artefakt'),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameC,
-                  decoration: const InputDecoration(labelText: 'Name'),
-                ),
-                /*
-                TextField(
-                  controller: idC,
-                  decoration: const InputDecoration(
-                    labelText: 'ID (z. B. R-123)',
-                  ),
-                ),
-                */
-                _typeDropdown(type, (v) => type = v ?? type),
-                Row(
-                  children: [
-                    const Text('Datum:'),
-                    const SizedBox(width: 12),
-                    TextButton(
-                      onPressed: () async {
-                        final p = await showDatePicker(
-                          context: context,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                          initialDate: date,
-                        );
-                        if (p != null) date = p;
-                      },
-                      child: Text(_fmtDate(date)),
-                    ),
-                  ],
-                ),
-                TextField(
-                  controller: ownerC,
-                  decoration: const InputDecoration(
-                    labelText: 'Ansprechpartner',
-                  ),
-                ),
-                TextField(
-                  controller: docC,
-                  decoration: const InputDecoration(labelText: 'Dokument-ID'),
-                ),
-                TextField(
-                  controller: notesC,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Notizen'),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Inputs (wählen → Link von Quelle → dieses Artefakt)',
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final a in artifacts)
-                      FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: typeByKey(a.type).color,
-                          radius: 8,
-                        ),
-                        label: Text(a.id),
-                        selected: inboundSel.contains(a.id),
-                        onSelected: (v) => setState(
-                          () => v
-                              ? inboundSel.add(a.id)
-                              : inboundSel.remove(a.id),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Outputs (wählen → Link von diesem Artefakt → Ziel)',
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final a in artifacts)
-                      FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: typeByKey(a.type).color,
-                          radius: 8,
-                        ),
-                        label: Text(a.id),
-                        selected: outboundSel.contains(a.id),
-                        onSelected: (v) => setState(
-                          () => v
-                              ? outboundSel.add(a.id)
-                              : outboundSel.remove(a.id),
-                        ),
-                      ),
-                  ],
-                ),
-                const Divider(height: 18),
-                Text(
-                  'Phasen-Zuordnung',
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final b in bands)
-                      FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: b.color,
-                          radius: 8,
-                        ),
-                        label: Text(b.label),
-                        selected: chosenBands.contains(b.id),
-                        onSelected: (v) => setState(() {
-                          v ? chosenBands.add(b.id) : chosenBands.remove(b.id);
-                        }),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Event-Zuordnung',
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final e in events)
-                      FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: e.color,
-                          radius: 8,
-                        ),
-                        label: Text(e.label),
-                        selected: chosenEvents.contains(e.id),
-                        onSelected: (v) => setState(() {
-                          v
-                              ? chosenEvents.add(e.id)
-                              : chosenEvents.remove(e.id);
-                        }),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Abbrechen'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (nameC.text.trim().isEmpty) return;
-
-              // generate unique ID if left empty
-              String id = idC.text.trim();
-              if (id.isEmpty) {
-                final rnd = math.Random();
-                do {
-                  id = "R-${rnd.nextInt(1000000)}";
-                } while (artifacts.any((a) => a.id == id));
-              }
-
-              final newArt = Artifact(
-                id: id,
-                name: nameC.text.trim(),
-                type: type,
-                owner: ownerC.text.trim(),
-                documentId: docC.text.trim(),
-                date: date,
-                y: 120 + (artifacts.length % 6) * 80,
-                notes: notesC.text.trim(),
-                bandIds: chosenBands.toList(),
-                eventIds: chosenEvents.toList(),
-                inputs: inboundSel.toList(),
-                outputs: outboundSel.toList(),
-              );
-              setState(() {
-                artifacts.add(newArt);
-                _applyIOSelections(newArt, inboundSel, outboundSel);
-              });
-              Navigator.pop(ctx);
-              _pushHistory();
-            },
-            child: const Text('Anlegen'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editArtifact(Artifact a) async {
-    final nameC = TextEditingController(text: a.name);
-    final ownerC = TextEditingController(text: a.owner);
-    final docC = TextEditingController(text: a.documentId);
-    final notesC = TextEditingController(text: a.notes);
-    String type = a.type;
-    DateTime date = a.date;
-    final chosenBands = a.bandIds.toSet();
-    final chosenEvents = a.eventIds.toSet();
-
-    // derive current IO selections from links (authoritative)
-    final inboundSel = _inboundOf(a.id).toSet();
-    final outboundSel = _outboundOf(a.id).toSet();
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: FractionallySizedBox(
-          heightFactor: 0.95,
-          child: Scaffold(
-            appBar: AppBar(title: Text('Artefakt bearbeiten: ${a.id}')),
-            body: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Neues Artefakt'),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   TextField(
                     controller: nameC,
                     decoration: const InputDecoration(labelText: 'Name'),
                   ),
-                  const SizedBox(height: 8),
                   _typeDropdown(type, (v) => type = v ?? type),
-                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Text('Datum:'),
@@ -1144,12 +945,14 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                       TextButton(
                         onPressed: () async {
                           final p = await showDatePicker(
-                            context: ctx,
+                            context: context,
                             firstDate: DateTime(2000),
                             lastDate: DateTime(2100),
                             initialDate: date,
                           );
-                          if (p != null) setState(() => date = p);
+                          if (p != null) {
+                            setLocal(() => date = p);
+                          }
                         },
                         child: Text(_fmtDate(date)),
                       ),
@@ -1161,68 +964,84 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                       labelText: 'Ansprechpartner',
                     ),
                   ),
-                  const SizedBox(height: 8),
                   TextField(
                     controller: docC,
                     decoration: const InputDecoration(labelText: 'Dokument-ID'),
                   ),
-                  const SizedBox(height: 8),
                   TextField(
                     controller: notesC,
                     maxLines: 3,
                     decoration: const InputDecoration(labelText: 'Notizen'),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+
+                  // NEW: Checkboxes
+                  CheckboxListTile(
+                    value: klar,
+                    onChanged: (v) => setLocal(() => klar = v ?? false),
+                    title: const Text("klar"),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  CheckboxListTile(
+                    value: liegtVor,
+                    onChanged: (v) => setLocal(() => liegtVor = v ?? false),
+                    title: const Text("liegt vor"),
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  const Divider(height: 18),
                   Text(
-                    'Inputs (von Quelle → ${a.id})',
+                    'Inputs (wählen → Link von Quelle → dieses Artefakt)',
                     style: Theme.of(ctx).textTheme.titleSmall,
                   ),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final other in artifacts.where((x) => x.id != a.id))
+                      for (final a in artifacts)
                         FilterChip(
                           avatar: CircleAvatar(
-                            backgroundColor: typeByKey(other.type).color,
+                            backgroundColor: typeByKey(a.type).color,
                             radius: 8,
                           ),
-                          label: Text(other.id),
-                          selected: inboundSel.contains(other.id),
+                          label: Text(a.id),
+                          selected: inboundSel.contains(a.id),
                           onSelected: (v) => setState(
                             () => v
-                                ? inboundSel.add(other.id)
-                                : inboundSel.remove(other.id),
+                                ? inboundSel.add(a.id)
+                                : inboundSel.remove(a.id),
                           ),
                         ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Outputs (${a.id} → Ziel)',
+                    'Outputs (wählen → Link von diesem Artefakt → Ziel)',
                     style: Theme.of(ctx).textTheme.titleSmall,
                   ),
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
                     children: [
-                      for (final other in artifacts.where((x) => x.id != a.id))
+                      for (final a in artifacts)
                         FilterChip(
                           avatar: CircleAvatar(
-                            backgroundColor: typeByKey(other.type).color,
+                            backgroundColor: typeByKey(a.type).color,
                             radius: 8,
                           ),
-                          label: Text(other.id),
-                          selected: outboundSel.contains(other.id),
+                          label: Text(a.id),
+                          selected: outboundSel.contains(a.id),
                           onSelected: (v) => setState(
                             () => v
-                                ? outboundSel.add(other.id)
-                                : outboundSel.remove(other.id),
+                                ? outboundSel.add(a.id)
+                                : outboundSel.remove(a.id),
                           ),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const Divider(height: 18),
                   Text(
                     'Phasen-Zuordnung',
                     style: Theme.of(ctx).textTheme.titleSmall,
@@ -1239,11 +1058,11 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                           ),
                           label: Text(b.label),
                           selected: chosenBands.contains(b.id),
-                          onSelected: (v) => setState(() {
-                            v
+                          onSelected: (v) => setState(
+                            () => v
                                 ? chosenBands.add(b.id)
-                                : chosenBands.remove(b.id);
-                          }),
+                                : chosenBands.remove(b.id),
+                          ),
                         ),
                     ],
                   ),
@@ -1264,88 +1083,346 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                           ),
                           label: Text(e.label),
                           selected: chosenEvents.contains(e.id),
-                          onSelected: (v) => setState(() {
-                            v
+                          onSelected: (v) => setState(
+                            () => v
                                 ? chosenEvents.add(e.id)
-                                : chosenEvents.remove(e.id);
-                          }),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Verknüpfte Links'),
-                  const SizedBox(height: 6),
-                  ...links
-                      .where((l) => l.fromId == a.id || l.toId == a.id)
-                      .map(
-                        (l) => ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.link),
-                          title: Text('${l.fromId} → ${l.toId}'),
-                          subtitle: Text(
-                            l.label.isEmpty ? '(ohne Label)' : l.label,
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Label bearbeiten',
-                                icon: const Icon(Icons.edit),
-                                onPressed: () => _editLink(l),
-                              ),
-                              IconButton(
-                                tooltip: 'Link löschen',
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () {
-                                  setState(() => links.remove(l));
-                                  _pushHistory();
-                                },
-                              ),
-                            ],
+                                : chosenEvents.remove(e.id),
                           ),
                         ),
-                      ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            artifacts.removeWhere((x) => x.id == a.id);
-                            links.removeWhere(
-                              (l) => l.fromId == a.id || l.toId == a.id,
-                            );
-                            _setFocus(null);
-                          });
-                          Navigator.pop(ctx);
-                          _pushHistory();
-                        },
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('Artefakt löschen'),
-                      ),
-                      const Spacer(),
-                      FilledButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            a.name = nameC.text.trim();
-                            a.type = type;
-                            a.owner = ownerC.text.trim();
-                            a.documentId = docC.text.trim();
-                            a.notes = notesC.text.trim();
-                            a.date = date;
-                            a.bandIds = chosenBands.toList();
-                            a.eventIds = chosenEvents.toList();
-                            _applyIOSelections(a, inboundSel, outboundSel);
-                          });
-                          Navigator.pop(ctx);
-                          _pushHistory();
-                        },
-                        icon: const Icon(Icons.save),
-                        label: const Text('Speichern'),
-                      ),
                     ],
                   ),
                 ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (nameC.text.trim().isEmpty) return;
+
+                // generate unique ID if left empty
+                String id = idC.text.trim();
+                if (id.isEmpty) {
+                  final rnd = math.Random();
+                  do {
+                    id = "R-${rnd.nextInt(1000000)}";
+                  } while (artifacts.any((a) => a.id == id));
+                }
+
+                final newArt = Artifact(
+                  id: id,
+                  name: nameC.text.trim(),
+                  type: type,
+                  owner: ownerC.text.trim(),
+                  documentId: docC.text.trim(),
+                  date: date,
+                  y: 120 + (artifacts.length % 6) * 80,
+                  notes: notesC.text.trim(),
+                  bandIds: chosenBands.toList(),
+                  eventIds: chosenEvents.toList(),
+                  inputs: inboundSel.toList(),
+                  outputs: outboundSel.toList(),
+                  klar: klar,
+                  liegtVor: liegtVor,
+                );
+                setState(() {
+                  artifacts.add(newArt);
+                  _applyIOSelections(newArt, inboundSel, outboundSel);
+                });
+                Navigator.pop(ctx);
+                _pushHistory();
+              },
+              child: const Text('Anlegen'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editArtifact(Artifact a) async {
+    final nameC = TextEditingController(text: a.name);
+    final ownerC = TextEditingController(text: a.owner);
+    final docC = TextEditingController(text: a.documentId);
+    final notesC = TextEditingController(text: a.notes);
+    String type = a.type;
+    DateTime date = a.date;
+    final chosenBands = a.bandIds.toSet();
+    final chosenEvents = a.eventIds.toSet();
+
+    // derive current IO selections from links
+    final inboundSel = _inboundOf(a.id).toSet();
+    final outboundSel = _outboundOf(a.id).toSet();
+
+    // NEW: local checkbox state
+    bool klar = a.klar;
+    bool liegtVor = a.liegtVor;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: FractionallySizedBox(
+            heightFactor: 0.95,
+            child: Scaffold(
+              appBar: AppBar(title: Text('Artefakt bearbeiten: ${a.id}')),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameC,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                    ),
+                    const SizedBox(height: 8),
+                    _typeDropdown(type, (v) => type = v ?? type),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Datum:'),
+                        const SizedBox(width: 12),
+                        TextButton(
+                          onPressed: () async {
+                            final p = await showDatePicker(
+                              context: ctx,
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                              initialDate: date,
+                            );
+                            if (p != null) setLocal(() => date = p);
+                          },
+                          child: Text(_fmtDate(date)),
+                        ),
+                      ],
+                    ),
+                    TextField(
+                      controller: ownerC,
+                      decoration: const InputDecoration(
+                        labelText: 'Ansprechpartner',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: docC,
+                      decoration: const InputDecoration(
+                        labelText: 'Dokument-ID',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: notesC,
+                      maxLines: 3,
+                      decoration: const InputDecoration(labelText: 'Notizen'),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // NEW: checkboxes
+                    CheckboxListTile(
+                      value: klar,
+                      onChanged: (v) => setLocal(() => klar = v ?? false),
+                      title: const Text("klar"),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    CheckboxListTile(
+                      value: liegtVor,
+                      onChanged: (v) => setLocal(() => liegtVor = v ?? false),
+                      title: const Text("liegt vor"),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+
+                    const SizedBox(height: 12),
+                    Text(
+                      'Inputs (von Quelle → ${a.id})',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final other in artifacts.where(
+                          (x) => x.id != a.id,
+                        ))
+                          FilterChip(
+                            avatar: CircleAvatar(
+                              backgroundColor: typeByKey(other.type).color,
+                              radius: 8,
+                            ),
+                            label: Text(other.id),
+                            selected: inboundSel.contains(other.id),
+                            onSelected: (v) => setState(
+                              () => v
+                                  ? inboundSel.add(other.id)
+                                  : inboundSel.remove(other.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Outputs (${a.id} → Ziel)',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final other in artifacts.where(
+                          (x) => x.id != a.id,
+                        ))
+                          FilterChip(
+                            avatar: CircleAvatar(
+                              backgroundColor: typeByKey(other.type).color,
+                              radius: 8,
+                            ),
+                            label: Text(other.id),
+                            selected: outboundSel.contains(other.id),
+                            onSelected: (v) => setState(
+                              () => v
+                                  ? outboundSel.add(other.id)
+                                  : outboundSel.remove(other.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Phasen-Zuordnung',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final b in bands)
+                          FilterChip(
+                            avatar: CircleAvatar(
+                              backgroundColor: b.color,
+                              radius: 8,
+                            ),
+                            label: Text(b.label),
+                            selected: chosenBands.contains(b.id),
+                            onSelected: (v) => setState(
+                              () => v
+                                  ? chosenBands.add(b.id)
+                                  : chosenBands.remove(b.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Event-Zuordnung',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final e in events)
+                          FilterChip(
+                            avatar: CircleAvatar(
+                              backgroundColor: e.color,
+                              radius: 8,
+                            ),
+                            label: Text(e.label),
+                            selected: chosenEvents.contains(e.id),
+                            onSelected: (v) => setState(
+                              () => v
+                                  ? chosenEvents.add(e.id)
+                                  : chosenEvents.remove(e.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    const Text('Verknüpfte Links'),
+                    const SizedBox(height: 6),
+                    ...links
+                        .where((l) => l.fromId == a.id || l.toId == a.id)
+                        .map(
+                          (l) => ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.link),
+                            title: Text('${l.fromId} → ${l.toId}'),
+                            subtitle: Text(
+                              l.label.isEmpty ? '(ohne Label)' : l.label,
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Label bearbeiten',
+                                  icon: const Icon(Icons.edit),
+                                  onPressed: () => _editLink(l),
+                                ),
+                                IconButton(
+                                  tooltip: 'Link löschen',
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () {
+                                    setState(() => links.remove(l));
+                                    _pushHistory();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              artifacts.removeWhere((x) => x.id == a.id);
+                              links.removeWhere(
+                                (l) => l.fromId == a.id || l.toId == a.id,
+                              );
+                              _setFocus(null);
+                            });
+                            Navigator.pop(ctx);
+                            _pushHistory();
+                          },
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Artefakt löschen'),
+                        ),
+                        const Spacer(),
+                        FilledButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              a.name = nameC.text.trim();
+                              a.type = type;
+                              a.owner = ownerC.text.trim();
+                              a.documentId = docC.text.trim();
+                              a.notes = notesC.text.trim();
+                              a.date = date;
+                              a.bandIds = chosenBands.toList();
+                              a.eventIds = chosenEvents.toList();
+                              a.klar = klar; // save checkbox
+                              a.liegtVor = liegtVor; // save checkbox
+                              _applyIOSelections(a, inboundSel, outboundSel);
+                            });
+                            Navigator.pop(ctx);
+                            _pushHistory();
+                          },
+                          icon: const Icon(Icons.save),
+                          label: const Text('Speichern'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -2316,12 +2393,36 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                   onChanged: (v) => setState(() => typeFilter = v),
                 ),
                 const SizedBox(width: 8),
-                Checkbox(
-                  value: showOnlyUnlinked,
-                  onChanged: (v) =>
-                      setState(() => showOnlyUnlinked = v ?? false),
+                DropdownButton<ArtifactFilter>(
+                  value: artifactFilter,
+                  onChanged: (v) {
+                    if (v != null) {
+                      setState(() {
+                        artifactFilter = v;
+                        _pushHistory();
+                      });
+                    }
+                  },
+                  items: const [
+                    DropdownMenuItem(
+                      value: ArtifactFilter.none,
+                      child: Text('Alle anzeigen'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.unlinked,
+                      child: Text('Nur unverlinkte'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.liegtVorOff,
+                      child: Text('Nur liegtVor = false'),
+                    ),
+                    DropdownMenuItem(
+                      value: ArtifactFilter.klarOff,
+                      child: Text('Nur klar = false'),
+                    ),
+                  ],
                 ),
-                const Text('nur Unverlinkte'),
+
                 const SizedBox(width: 8),
                 Checkbox(
                   value: dimFiltered,

@@ -19,11 +19,14 @@ class Artifact {
   DateTime date;
   double y;
   String notes;
-  List<String> inputs; // kept in sync with inbound selections
-  List<String> outputs; // kept in sync with outbound selections
-  // memberships
+  List<String> inputs; // inbound selections
+  List<String> outputs; // outbound selections
   List<String> bandIds; // phases
   List<String> eventIds; // milestones
+
+  /// new fields
+  bool klar;
+  bool liegtVor;
 
   Artifact({
     String? id, // optional, wird generiert wenn null
@@ -38,6 +41,8 @@ class Artifact {
     List<String>? outputs,
     List<String>? bandIds,
     List<String>? eventIds,
+    this.klar = false,
+    this.liegtVor = false,
   }) : id = id ?? UniqueKey().toString(),
        inputs = inputs ?? [],
        outputs = outputs ?? [],
@@ -57,10 +62,12 @@ class Artifact {
     'outputs': outputs,
     'bandIds': bandIds,
     'eventIds': eventIds,
+    'klar': klar,
+    'liegtVor': liegtVor,
   };
 
   static Artifact fromJson(Map<String, dynamic> j) => Artifact(
-    id: j['id'], // nimmt vorhandene ID, oder generiert im Konstruktor eine neue
+    id: j['id'],
     name: j['name'],
     type: j['type'],
     owner: j['owner'] ?? '',
@@ -72,5 +79,7 @@ class Artifact {
     outputs: (j['outputs'] as List?)?.map((e) => e.toString()).toList() ?? [],
     bandIds: (j['bandIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
     eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
+    klar: j['klar'] ?? false,
+    liegtVor: j['liegtVor'] ?? false,
   );
 }
