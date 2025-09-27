@@ -38,10 +38,6 @@ String _fmtDate(DateTime d) =>
 List<String> _splitList(String s) =>
     s.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
 
-// ----------------------------- Data Models ---------------------------------
-
-// dated milestone pin
-
 // ------------------------------ Home ---------------------------------------
 class TraceabilityHome extends StatefulWidget {
   const TraceabilityHome({super.key});
@@ -916,12 +912,14 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                   controller: nameC,
                   decoration: const InputDecoration(labelText: 'Name'),
                 ),
+                /*
                 TextField(
                   controller: idC,
                   decoration: const InputDecoration(
                     labelText: 'ID (z. B. R-123)',
                   ),
                 ),
+                */
                 _typeDropdown(type, (v) => type = v ?? type),
                 Row(
                   children: [
@@ -1065,9 +1063,19 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
           ),
           FilledButton(
             onPressed: () {
-              if (nameC.text.trim().isEmpty || idC.text.trim().isEmpty) return;
+              if (nameC.text.trim().isEmpty) return;
+
+              // generate unique ID if left empty
+              String id = idC.text.trim();
+              if (id.isEmpty) {
+                final rnd = math.Random();
+                do {
+                  id = "R-${rnd.nextInt(1000000)}";
+                } while (artifacts.any((a) => a.id == id));
+              }
+
               final newArt = Artifact(
-                id: idC.text.trim(),
+                id: id,
                 name: nameC.text.trim(),
                 type: type,
                 owner: ownerC.text.trim(),
@@ -1082,7 +1090,6 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
               );
               setState(() {
                 artifacts.add(newArt);
-                // apply IO links now that artifact exists
                 _applyIOSelections(newArt, inboundSel, outboundSel);
               });
               Navigator.pop(ctx);
