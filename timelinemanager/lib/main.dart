@@ -6,6 +6,7 @@ import 'package:timelinemanager/classes/link.dart';
 import 'package:timelinemanager/classes/timeEvent.dart';
 import 'package:timelinemanager/classes/timeband.dart';
 import 'package:timelinemanager/classes/timelinePainter.dart';
+import 'dart:html' as html; // only works in web builds
 
 void main() => runApp(const TraceabilityApp());
 
@@ -2187,25 +2188,23 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     );
   }
 
-  void _exportJson() {
-    final data = _serialize();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Export JSON'),
-        content: SizedBox(
-          width: 640,
-          child: SelectableText(data, maxLines: 24),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
+void _exportJson() {
+  final data = _serialize();
+
+  // format date as YYYY-MM-DD
+  final now = DateTime.now();
+  final time = "${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}";
+
+  final date = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+  final bytes = utf8.encode(data);
+  final blob = html.Blob([bytes]);
+  final url = html.Url.createObjectUrlFromBlob(blob);
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute("download", "traceability_export_$date _$time.txt")
+    ..click();
+  html.Url.revokeObjectUrl(url);
+}
 
   void _importJson() async {
     final controller = TextEditingController();
