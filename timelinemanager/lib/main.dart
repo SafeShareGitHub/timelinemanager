@@ -115,6 +115,11 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     super.initState();
     _seedDemo();
     _pushHistory();
+      html.window.onBeforeUnload.listen((event) {
+    event.preventDefault();
+    (event as dynamic).returnValue = ''; // Trick: dynamic-Cast
+
+  });
   }
 
   void _seedDemo() {
