@@ -57,6 +57,10 @@ enum ArtifactFilter {
 
 class _TraceabilityHomeState extends State<TraceabilityHome> {
   // State
+  String timelineTitle = "Timeline Traceability — MAX v2.5";
+  bool _isEditingTitle = false;
+  final TextEditingController _titleController = TextEditingController();
+
   final List<Artifact> artifacts = [];
   final List<Link> links = [];
   final List<ArtifactType> artifactTypes = [
@@ -246,6 +250,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
   // -------------------------- History (Undo/Redo) --------------------------
   String _serialize() => jsonEncode({
+    'title': timelineTitle,   // <-- NEW
     'origin': origin.toIso8601String(),
     'endDate': endDate.toIso8601String(),
     'pxPerDay': pxPerDay,
@@ -270,6 +275,8 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
   });
   void _restore(String jsonStr) {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    timelineTitle = map['title'] ?? "Timeline Traceability — MAX v2.5"; // <-- NEW
+
     origin = DateTime.parse(map['origin']);
     endDate = DateTime.parse(map['endDate']);
     pxPerDay = (map['pxPerDay'] as num).toDouble();
@@ -2196,20 +2203,23 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 void _exportJson() {
   final data = _serialize();
 
-  // format date as YYYY-MM-DD
+  // format date as YYYY-MM-DD and HH-mm
   final now = DateTime.now();
   final time = "${now.hour.toString().padLeft(2, '0')}-${now.minute.toString().padLeft(2, '0')}";
-
   final date = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+  // sanitize title for safe filename use
+  final safeTitle = timelineTitle.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_').trim();
 
   final bytes = utf8.encode(data);
   final blob = html.Blob([bytes]);
   final url = html.Url.createObjectUrlFromBlob(blob);
   final anchor = html.AnchorElement(href: url)
-    ..setAttribute("download", "traceability_export_$date _$time.txt")
+    ..setAttribute("download", "${safeTitle}_$date _$time.txt")
     ..click();
   html.Url.revokeObjectUrl(url);
 }
+
 
   void _importJson() async {
     final controller = TextEditingController();
@@ -2260,8 +2270,45 @@ void _exportJson() {
     final canvasWidth = 140 + daysRange * pxPerDay + 200;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Timeline Traceability — MAX v2.5'),
+
+  appBar: AppBar(
+  title: Row(
+    children: [
+      Expanded(
+        child: _isEditingTitle
+            ? TextField(
+                controller: _titleController..text = timelineTitle,
+                autofocus: true,
+                onSubmitted: (value) {
+                  setState(() {
+                    timelineTitle = value.trim().isEmpty
+                        ? "Timeline Traceability — MAX v2.5"
+                        : value.trim();
+                    _isEditingTitle = false;
+                    _pushHistory();
+                  });
+                },
+              )
+            : Text(timelineTitle),
+      ),
+      IconButton(
+        icon: Icon(_isEditingTitle ? Icons.check : Icons.edit),
+        onPressed: () {
+          setState(() {
+            if (_isEditingTitle) {
+              timelineTitle = _titleController.text.trim().isEmpty
+                  ? "Timeline Traceability — MAX v2.5"
+                  : _titleController.text.trim();
+              _pushHistory();
+            } else {
+              _titleController.text = timelineTitle;
+            }
+            _isEditingTitle = !_isEditingTitle;
+          });
+        },
+      ),
+    ],
+  ),
         actions: [
           IconButton(
             tooltip: 'Undo',
