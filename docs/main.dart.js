@@ -90595,7 +90595,7 @@ if(d.ok)o.push(A.azh(0,A.iY(A.jK(c,c,B.y,B.u,c,c,c,c,c,c,c,c,c),!0,c)))
 p=A.X(r)
 B.b.X(o,new A.dj(new A.ay(r,new A.avb(d),p.i("ay<1>")),new A.avc(d),p.i("dj<1,e>")))
 B.b.X(o,new A.ae(s,new A.avd(d),A.X(s).i("ae<1,e>")))
-a=A.i7(new A.zi(A.cn(A.ki(B.cy,o,B.A,B.bS,c),1760,140+b*a+200),!1,2.5,0.5,c),1)
+a=A.i7(new A.zi(A.cn(A.ki(B.cy,o,B.A,B.bS,c),4000,140+b*a+200),!1,2.5,0.5,c),1)
 o=A.E(a2).ax
 p=o.R8
 if(p==null)p=o.k2
@@ -91934,7 +91934,7 @@ A.av1.prototype={
 $1(a){var s,r=this.a,q=r.p2,p=this.b.a,o=q.h(0,p)
 if(o==null)o=this.c
 s=a.d
-q.t(0,p,new A.f(o.a+s.a,B.d.dK(o.b+s.b,60,1720)))
+q.t(0,p,new A.f(o.a+s.a,B.d.dK(o.b+s.b,60,3960)))
 r.M(new A.auO())},
 $S:12}
 A.auO.prototype={
