@@ -6,6 +6,7 @@ import 'package:timelinemanager/classes/link.dart';
 import 'package:timelinemanager/classes/timeEvent.dart';
 import 'package:timelinemanager/classes/timeband.dart';
 import 'package:timelinemanager/classes/timelinePainter.dart';
+import 'package:timelinemanager/classes/project_person.dart';
 import 'dart:html' as html; // only works in web builds
 
 void main() => runApp(const TraceabilityApp());
@@ -113,6 +114,14 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
   // Drag helper
   final Map<String, Offset> _dragPosOverride = {};
+
+  // Project people
+  final List<ProjectPerson> projectPeople = [];
+
+  // To-do panel state (canvas)
+  String? _todoAddingForArtifactId;
+  String? _todoAddingAssigneeId;
+  final TextEditingController _todoNewItemController = TextEditingController();
 
   @override
   void initState() {
@@ -272,6 +281,7 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     'dimFiltered': dimFiltered,
     'focusArtifactId': focusArtifactId,
     'focusDimOthers': focusDimOthers,
+    'people': projectPeople.map((p) => p.toJson()).toList(),
   });
   void _restore(String jsonStr) {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
@@ -337,6 +347,13 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
 
     focusArtifactId = map['focusArtifactId'];
     focusDimOthers = map['focusDimOthers'] ?? true;
+    projectPeople
+      ..clear()
+      ..addAll(
+        ((map['people'] as List?) ?? []).map(
+          (e) => ProjectPerson.fromJson(Map<String, dynamic>.from(e)),
+        ),
+      );
     if (focusArtifactId != null) {
       final res = _computeConnected(focusArtifactId!);
       _focusedArtifactIds = res.$1;
@@ -1157,6 +1174,244 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     );
   }
 
+  Widget _buildTodoPanelForArtifact(Artifact a, Offset pos) {
+    return Positioned(
+      left: pos.dx + 82,
+      top: pos.dy - 22,
+      child: Material(
+        elevation: 3,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 230,
+          constraints: const BoxConstraints(maxHeight: 320),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.checklist, size: 15, color: Colors.grey[700]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'To-Do',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const Spacer(),
+                    InkWell(
+                      onTap: () => setState(() {
+                        _todoAddingForArtifactId = a.id;
+                        _todoNewItemController.clear();
+                      }),
+                      child: Icon(
+                        Icons.add,
+                        size: 16,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                if (a.todos.isEmpty && _todoAddingForArtifactId != a.id)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'No to-dos yet',
+                      style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                    ),
+                  ),
+                ...a.todos.map((todo) {
+                  final assignee = projectPeople.firstWhereOrNull(
+                    (p) => p.id == todo.assigneeId,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: Checkbox(
+                            value: todo.done,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (v) => setState(() {
+                              todo.done = v ?? false;
+                              _pushHistory();
+                            }),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            todo.text,
+                            style: TextStyle(
+                              fontSize: 11,
+                              decoration: todo.done
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              color: todo.done
+                                  ? Colors.grey[400]
+                                  : Colors.black87,
+                            ),
+                          ),
+                        ),
+                        if (assignee != null) ...[
+                          Tooltip(
+                            message: assignee.role.isEmpty
+                                ? assignee.name
+                                : '${assignee.name} — ${assignee.role}',
+                            child: CircleAvatar(
+                              radius: 9,
+                              child: Text(
+                                assignee.initials,
+                                style: const TextStyle(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                        ],
+                        InkWell(
+                          onTap: () => setState(() {
+                            a.todos.remove(todo);
+                            _pushHistory();
+                          }),
+                          child: Icon(
+                            Icons.close,
+                            size: 12,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (_todoAddingForArtifactId == a.id)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _todoNewItemController,
+                                autofocus: true,
+                                style: const TextStyle(fontSize: 11),
+                                decoration: const InputDecoration(
+                                  hintText: 'New to-do…',
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 4,
+                                  ),
+                                ),
+                                onSubmitted: (v) {
+                                  if (v.trim().isNotEmpty) {
+                                    setState(() {
+                                      a.todos.add(
+                                        TodoItem(
+                                          text: v.trim(),
+                                          assigneeId: _todoAddingAssigneeId,
+                                        ),
+                                      );
+                                      _todoNewItemController.clear();
+                                      _todoAddingForArtifactId = null;
+                                      _todoAddingAssigneeId = null;
+                                      _pushHistory();
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.check, size: 14),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 24,
+                                minHeight: 24,
+                              ),
+                              onPressed: () {
+                                final v = _todoNewItemController.text.trim();
+                                setState(() {
+                                  if (v.isNotEmpty) {
+                                    a.todos.add(
+                                      TodoItem(
+                                        text: v,
+                                        assigneeId: _todoAddingAssigneeId,
+                                      ),
+                                    );
+                                    _pushHistory();
+                                  }
+                                  _todoNewItemController.clear();
+                                  _todoAddingForArtifactId = null;
+                                  _todoAddingAssigneeId = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        if (projectPeople.isNotEmpty)
+                          DropdownButton<String?>(
+                            value: _todoAddingAssigneeId,
+                            hint: Text(
+                              'Assign to…',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                            isDense: true,
+                            isExpanded: true,
+                            underline: const SizedBox(),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: Colors.black87,
+                            ),
+                            items: [
+                              const DropdownMenuItem<String?>(
+                                value: null,
+                                child: Text('— Unassigned'),
+                              ),
+                              ...projectPeople.map(
+                                (p) => DropdownMenuItem<String?>(
+                                  value: p.id,
+                                  child: Text(
+                                    p.role.isEmpty
+                                        ? p.name
+                                        : '${p.name} (${p.role})',
+                                  ),
+                                ),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _todoAddingAssigneeId = v),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _editArtifact(Artifact a) async {
     final nameC = TextEditingController(text: a.name);
     final ownerC = TextEditingController(text: a.owner);
@@ -1174,6 +1429,13 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
     // NEW: local checkbox state
     bool klar = a.klar;
     bool liegtVor = a.liegtVor;
+
+    final localTodos = a.todos
+        .map((t) => TodoItem(text: t.text, done: t.done, assigneeId: t.assigneeId))
+        .toList();
+    final todoTextC = TextEditingController();
+    bool todoAdding = false;
+    String? selectedAddAssigneeId;
 
     await showModalBottomSheet(
       context: context,
@@ -1255,61 +1517,78 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                       contentPadding: EdgeInsets.zero,
                     ),
 
-                    const SizedBox(height: 12),
-                    Text(
-                      'Inputs (von Quelle → ${a.id})',
-                      style: Theme.of(ctx).textTheme.titleSmall,
-                    ),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
+                    const SizedBox(height: 8),
+                    ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: Text(
+                        'Links (Inputs / Outputs)',
+                        style: Theme.of(ctx).textTheme.titleSmall,
+                      ),
                       children: [
-                        for (final other in artifacts.where(
-                          (x) => x.id != a.id,
-                        ))
-                          FilterChip(
-                            avatar: CircleAvatar(
-                              backgroundColor: typeByKey(other.type).color,
-                              radius: 8,
-                            ),
-                            label: Text(other.id),
-                            selected: inboundSel.contains(other.id),
-                            onSelected: (v) => setState(
-                              () => v
-                                  ? inboundSel.add(other.id)
-                                  : inboundSel.remove(other.id),
-                            ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Inputs (von Quelle → ${a.id})',
+                            style: Theme.of(ctx).textTheme.labelMedium,
                           ),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final other in artifacts.where(
+                              (x) => x.id != a.id,
+                            ))
+                              FilterChip(
+                                avatar: CircleAvatar(
+                                  backgroundColor: typeByKey(other.type).color,
+                                  radius: 8,
+                                ),
+                                label: Text(other.id),
+                                selected: inboundSel.contains(other.id),
+                                onSelected: (v) => setState(
+                                  () => v
+                                      ? inboundSel.add(other.id)
+                                      : inboundSel.remove(other.id),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Outputs (${a.id} → Ziel)',
+                            style: Theme.of(ctx).textTheme.labelMedium,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final other in artifacts.where(
+                              (x) => x.id != a.id,
+                            ))
+                              FilterChip(
+                                avatar: CircleAvatar(
+                                  backgroundColor: typeByKey(other.type).color,
+                                  radius: 8,
+                                ),
+                                label: Text(other.id),
+                                selected: outboundSel.contains(other.id),
+                                onSelected: (v) => setState(
+                                  () => v
+                                      ? outboundSel.add(other.id)
+                                      : outboundSel.remove(other.id),
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      'Outputs (${a.id} → Ziel)',
-                      style: Theme.of(ctx).textTheme.titleSmall,
-                    ),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final other in artifacts.where(
-                          (x) => x.id != a.id,
-                        ))
-                          FilterChip(
-                            avatar: CircleAvatar(
-                              backgroundColor: typeByKey(other.type).color,
-                              radius: 8,
-                            ),
-                            label: Text(other.id),
-                            selected: outboundSel.contains(other.id),
-                            onSelected: (v) => setState(
-                              () => v
-                                  ? outboundSel.add(other.id)
-                                  : outboundSel.remove(other.id),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
                     Text(
                       'Phasen-Zuordnung',
                       style: Theme.of(ctx).textTheme.titleSmall,
@@ -1359,39 +1638,181 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Verknüpfte Links'),
+                    const SizedBox(height: 12),
+                    Text(
+                      'To-Do',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
                     const SizedBox(height: 6),
-                    ...links
-                        .where((l) => l.fromId == a.id || l.toId == a.id)
-                        .map(
-                          (l) => ListTile(
+                    ...localTodos.map((todo) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CheckboxListTile(
                             dense: true,
-                            leading: const Icon(Icons.link),
-                            title: Text('${l.fromId} → ${l.toId}'),
-                            subtitle: Text(
-                              l.label.isEmpty ? '(ohne Label)' : l.label,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            value: todo.done,
+                            onChanged: (v) =>
+                                setLocal(() => todo.done = v ?? false),
+                            title: Text(
+                              todo.text,
+                              style: TextStyle(
+                                decoration: todo.done
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                color: todo.done ? Colors.grey : null,
+                              ),
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Label bearbeiten',
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _editLink(l),
-                                ),
-                                IconButton(
-                                  tooltip: 'Link löschen',
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: () {
-                                    setState(() => links.remove(l));
-                                    _pushHistory();
-                                  },
-                                ),
-                              ],
+                            subtitle: projectPeople.isEmpty
+                                ? null
+                                : DropdownButton<String?>(
+                                    value: todo.assigneeId,
+                                    hint: Text(
+                                      'Unassigned',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey[400],
+                                      ),
+                                    ),
+                                    isDense: true,
+                                    underline: const SizedBox(),
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.black87,
+                                    ),
+                                    items: [
+                                      const DropdownMenuItem<String?>(
+                                        value: null,
+                                        child: Text('— Unassigned'),
+                                      ),
+                                      ...projectPeople.map(
+                                        (p) => DropdownMenuItem<String?>(
+                                          value: p.id,
+                                          child: Text(
+                                            p.role.isEmpty
+                                                ? p.name
+                                                : '${p.name} (${p.role})',
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (v) =>
+                                        setLocal(() => todo.assigneeId = v),
+                                  ),
+                            secondary: IconButton(
+                              icon: const Icon(Icons.delete_outline, size: 16),
+                              onPressed: () =>
+                                  setLocal(() => localTodos.remove(todo)),
                             ),
                           ),
+                        ],
+                      );
+                    }),
+                    if (todoAdding)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: todoTextC,
+                                  autofocus: true,
+                                  decoration: const InputDecoration(
+                                    hintText: 'New to-do…',
+                                    isDense: true,
+                                  ),
+                                  onSubmitted: (v) {
+                                    if (v.trim().isNotEmpty) {
+                                      setLocal(() {
+                                        localTodos.add(
+                                          TodoItem(
+                                            text: v.trim(),
+                                            assigneeId: selectedAddAssigneeId,
+                                          ),
+                                        );
+                                        todoTextC.clear();
+                                        todoAdding = false;
+                                        selectedAddAssigneeId = null;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.check),
+                                onPressed: () {
+                                  final v = todoTextC.text.trim();
+                                  setLocal(() {
+                                    if (v.isNotEmpty) {
+                                      localTodos.add(
+                                        TodoItem(
+                                          text: v,
+                                          assigneeId: selectedAddAssigneeId,
+                                        ),
+                                      );
+                                    }
+                                    todoTextC.clear();
+                                    todoAdding = false;
+                                    selectedAddAssigneeId = null;
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                          if (projectPeople.isNotEmpty)
+                            DropdownButton<String?>(
+                              value: selectedAddAssigneeId,
+                              hint: Text(
+                                'Assign to…',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                              isDense: true,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.black87,
+                              ),
+                              items: [
+                                const DropdownMenuItem<String?>(
+                                  value: null,
+                                  child: Text('— Unassigned'),
+                                ),
+                                ...projectPeople.map(
+                                  (p) => DropdownMenuItem<String?>(
+                                    value: p.id,
+                                    child: Text(
+                                      p.role.isEmpty
+                                          ? p.name
+                                          : '${p.name} (${p.role})',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              onChanged: (v) =>
+                                  setLocal(() => selectedAddAssigneeId = v),
+                            ),
+                        ],
+                      )
+                    else
+                      TextButton.icon(
+                        onPressed: () => setLocal(() => todoAdding = true),
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('Add to-do'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+                      ),
                     const SizedBox(height: 20),
                     Row(
                       children: [
@@ -1422,8 +1843,9 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
                               a.date = date;
                               a.bandIds = chosenBands.toList();
                               a.eventIds = chosenEvents.toList();
-                              a.klar = klar; // save checkbox
-                              a.liegtVor = liegtVor; // save checkbox
+                              a.klar = klar;
+                              a.liegtVor = liegtVor;
+                              a.todos = localTodos;
                               _applyIOSelections(a, inboundSel, outboundSel);
                             });
                             Navigator.pop(ctx);
@@ -1473,6 +1895,121 @@ class _TraceabilityHomeState extends State<TraceabilityHome> {
           ),
         ],
       ),
+    );
+  }
+
+  void _manageProjectPeople() async {
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        final nameC = TextEditingController();
+        final roleC = TextEditingController();
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text('Project People'),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (projectPeople.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Text(
+                          'No people defined yet.',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    ...projectPeople.map(
+                      (p) => ListTile(
+                        dense: true,
+                        leading: CircleAvatar(
+                          radius: 16,
+                          child: Text(
+                            p.initials,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        title: Text(p.name),
+                        subtitle: Text(
+                          p.role.isEmpty ? '—' : p.role,
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          tooltip: 'Remove',
+                          onPressed: () {
+                            setState(() {
+                              projectPeople.remove(p);
+                              // clear assignee refs pointing to removed person
+                              for (final a in artifacts) {
+                                for (final t in a.todos) {
+                                  if (t.assigneeId == p.id) t.assigneeId = null;
+                                }
+                              }
+                              _pushHistory();
+                            });
+                            setLocal(() {});
+                          },
+                        ),
+                      ),
+                    ),
+                    const Divider(),
+                    Text(
+                      'Add person',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: nameC,
+                      decoration: const InputDecoration(
+                        labelText: 'Name',
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: roleC,
+                      decoration: const InputDecoration(
+                        labelText: 'Role / Responsibility',
+                        isDense: true,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (nameC.text.trim().isEmpty) return;
+                  setState(() {
+                    projectPeople.add(
+                      ProjectPerson(
+                        name: nameC.text.trim(),
+                        role: roleC.text.trim(),
+                      ),
+                    );
+                    _pushHistory();
+                  });
+                  nameC.clear();
+                  roleC.clear();
+                  setLocal(() {});
+                },
+                child: const Text('Add'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -2321,6 +2858,11 @@ void _exportJson() {
             icon: const Icon(Icons.redo),
           ),
           IconButton(
+            tooltip: 'Project People',
+            onPressed: _manageProjectPeople,
+            icon: const Icon(Icons.people_outline),
+          ),
+          IconButton(
             tooltip: 'Typen verwalten',
             onPressed: _manageTypes,
             icon: const Icon(Icons.category_outlined),
@@ -2629,10 +3171,9 @@ void _exportJson() {
                     }),
 
                     // artifacts
-                    ...artifacts.map((a) {
+                    ...artifacts.expand<Widget>((a) {
                       final isVis = visibleArtifact(a);
-                      if (!dimFiltered && !isVis)
-                        return const SizedBox.shrink();
+                      if (!dimFiltered && !isVis) return [];
                       final basePos = Offset(xForDate(a.date), a.y);
                       final pos = _dragPosOverride[a.id] ?? basePos;
                       final t = typeByKey(a.type);
@@ -2657,7 +3198,7 @@ void _exportJson() {
                         1.0,
                       );
 
-                      return Positioned(
+                      final artWidget = Positioned(
                         left: pos.dx - 70,
                         top: pos.dy - 22,
                         child: GestureDetector(
@@ -2781,6 +3322,13 @@ void _exportJson() {
                           ),
                         ),
                       );
+                      if (focusArtifactId == a.id) {
+                        return [
+                          artWidget,
+                          _buildTodoPanelForArtifact(a, pos),
+                        ];
+                      }
+                      return [artWidget];
                     }),
                   ],
                 ),

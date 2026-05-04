@@ -1,5 +1,19 @@
 import 'package:flutter/material.dart';
 
+class TodoItem {
+  String text;
+  bool done;
+  String? assigneeId;
+  TodoItem({required this.text, this.done = false, this.assigneeId});
+  Map<String, dynamic> toJson() =>
+      {'text': text, 'done': done, 'assigneeId': assigneeId};
+  static TodoItem fromJson(Map<String, dynamic> j) => TodoItem(
+    text: j['text'] ?? '',
+    done: j['done'] ?? false,
+    assigneeId: j['assigneeId'],
+  );
+}
+
 class ArtifactType {
   String key;
   int colorValue;
@@ -27,6 +41,7 @@ class Artifact {
   /// new fields
   bool klar;
   bool liegtVor;
+  List<TodoItem> todos;
 
   Artifact({
     String? id, // optional, wird generiert wenn null
@@ -43,11 +58,13 @@ class Artifact {
     List<String>? eventIds,
     this.klar = false,
     this.liegtVor = false,
+    List<TodoItem>? todos,
   }) : id = id ?? UniqueKey().toString(),
        inputs = inputs ?? [],
        outputs = outputs ?? [],
        bandIds = bandIds ?? [],
-       eventIds = eventIds ?? [];
+       eventIds = eventIds ?? [],
+       todos = todos ?? [];
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -64,6 +81,7 @@ class Artifact {
     'eventIds': eventIds,
     'klar': klar,
     'liegtVor': liegtVor,
+    'todos': todos.map((t) => t.toJson()).toList(),
   };
 
   static Artifact fromJson(Map<String, dynamic> j) => Artifact(
@@ -81,5 +99,9 @@ class Artifact {
     eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
     klar: j['klar'] ?? false,
     liegtVor: j['liegtVor'] ?? false,
+    todos: (j['todos'] as List?)
+            ?.map((e) => TodoItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList() ??
+        [],
   );
 }
