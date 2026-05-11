@@ -496,19 +496,55 @@ class TimelineController extends ChangeNotifier {
   /// exit.
   Future<void> persistNow() async {
     _autosaveTimer?.cancel();
-    _syncActiveSlot(serialize());
-    if (_projects.isEmpty) return;
-    final data = SessionData(
-      _currentProjectIndex,
-      _projects
-          .map((p) => SessionProject(p.title, p.dataJson))
-          .toList(growable: false),
-    );
+    final data = _currentSessionData();
+    if (data == null) return;
     try {
       await writeSession(data);
     } catch (_) {
       // Best-effort; ignore disk failures so the UI keeps working.
     }
+  }
+
+  /// Writes a dated snapshot of the current session. Returns the absolute
+  /// path on success, null if there's nothing to snapshot or the write
+  /// fails.
+  Future<String?> takeDailySnapshot() async {
+    final data = _currentSessionData();
+    if (data == null) return null;
+    try {
+      return await writeDailySnapshot(data);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Replaces every project with the contents of [data]. The active slot is
+  /// snapshotted into [_projects] first via [_currentSessionData] is *not*
+  /// applicable here — we deliberately discard the in-memory state.
+  void restoreFromSession(SessionData data) {
+    if (data.projects.isEmpty) return;
+    _projects
+      ..clear()
+      ..addAll(
+        data.projects.map((p) => _ProjectSlot(p.title, p.dataJson)),
+      );
+    _currentProjectIndex = data.currentIndex.clamp(0, _projects.length - 1);
+    restore(_projects[_currentProjectIndex].dataJson);
+    _history.clear();
+    _historyIndex = -1;
+    pushHistory();
+    notifyListeners();
+  }
+
+  SessionData? _currentSessionData() {
+    _syncActiveSlot(serialize());
+    if (_projects.isEmpty) return null;
+    return SessionData(
+      _currentProjectIndex,
+      _projects
+          .map((p) => SessionProject(p.title, p.dataJson))
+          .toList(growable: false),
+    );
   }
 
   @override

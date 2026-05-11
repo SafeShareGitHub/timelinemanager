@@ -7,6 +7,7 @@ import 'package:timelinemanager/dialogues/focusdepth.dart';
 import 'package:timelinemanager/dialogues/managebands.dart';
 import 'package:timelinemanager/dialogues/manageevents.dart';
 import 'package:timelinemanager/dialogues/managetypes.dart';
+import 'package:timelinemanager/dialogues/sessionrestore.dart';
 import 'package:timelinemanager/dialogues/yearfilter.dart';
 import 'package:timelinemanager/platform/session_store.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
@@ -73,6 +74,20 @@ class _TimelineAppBarState extends State<TimelineAppBar> {
     await c.persistNow();
     if (!mounted) return;
     quitApp();
+  }
+
+  Future<void> _handleSnapshot() async {
+    final path = await c.takeDailySnapshot();
+    if (!mounted) return;
+    if (path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Snapshot fehlgeschlagen.')),
+      );
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Snapshot gespeichert: $path')),
+    );
   }
 
   @override
@@ -174,6 +189,17 @@ class _TimelineAppBarState extends State<TimelineAppBar> {
           icon: const Icon(Icons.upload),
         ),
         const SizedBox(width: 12),
+        IconButton(
+          tooltip: 'Snapshot von heute speichern',
+          onPressed:
+              kSessionPersistenceSupported ? _handleSnapshot : null,
+          icon: const Icon(Icons.save_alt),
+        ),
+        IconButton(
+          tooltip: 'Sitzung wiederherstellen…',
+          onPressed: () => showSessionRestoreDialog(context, c),
+          icon: const Icon(Icons.restore),
+        ),
         IconButton(
           tooltip: kSessionPersistenceSupported
               ? 'Sitzung speichern & beenden'

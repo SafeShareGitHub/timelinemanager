@@ -20,3 +20,18 @@ class SessionData {
   final List<SessionProject> projects;
   const SessionData(this.currentIndex, this.projects);
 }
+
+/// A discovered snapshot file on disk. Returned by `listSnapshots()` so the
+/// restore dialog can show the user what's available.
+class SnapshotEntry {
+  final String path;
+  final String name;
+  final DateTime modified;
+  final int projectCount;
+  const SnapshotEntry({
+    required this.path,
+    required this.name,
+    required this.modified,
+    required this.projectCount,
+  });
+}
