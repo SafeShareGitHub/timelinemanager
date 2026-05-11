@@ -5,7 +5,7 @@ import 'package:timelinemanager/classes/artifact.dart';
 import 'package:timelinemanager/classes/link.dart';
 import 'package:timelinemanager/classes/timeEvent.dart';
 import 'package:timelinemanager/classes/timeband.dart';
-import 'package:timelinemanager/main.dart';
+import 'package:timelinemanager/utils/iterable_ext.dart';
 
 class TimelinePainter extends CustomPainter {
   final DateTime origin;
