@@ -4,6 +4,8 @@ import 'package:timelinemanager/dialogues/editlink.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
 import 'package:timelinemanager/utils/date_utils.dart';
 import 'package:timelinemanager/widgets/linked_files_field.dart';
+import 'package:timelinemanager/widgets/person_autocomplete_field.dart';
+import 'package:timelinemanager/widgets/todo_list_editor.dart';
 import 'package:timelinemanager/widgets/type_dropdown.dart';
 
 Future<void> showEditArtifactDialog(
@@ -20,9 +22,8 @@ Future<void> showEditArtifactDialog(
   DateTime date = a.date;
   final chosenBands = a.bandIds.toSet();
   final chosenEvents = a.eventIds.toSet();
-
-  final inboundSel = c.inboundOf(a.id).toSet();
-  final outboundSel = c.outboundOf(a.id).toSet();
+  final chosenGates = a.qualityGateIds.toSet();
+  final todos = a.todos.map((t) => t.copy()).toList();
 
   bool klar = a.klar;
   bool liegtVor = a.liegtVor;
@@ -71,8 +72,9 @@ Future<void> showEditArtifactDialog(
                       ),
                     ],
                   ),
-                  TextField(
+                  PersonAutocompleteField(
                     controller: ownerC,
+                    options: c.personNames,
                     decoration: const InputDecoration(
                       labelText: 'Ansprechpartner',
                     ),
@@ -112,53 +114,34 @@ Future<void> showEditArtifactDialog(
                     contentPadding: EdgeInsets.zero,
                   ),
                   const SizedBox(height: 12),
+                  TodoListEditor(
+                    todos: todos,
+                    setLocal: setLocal,
+                    personNames: c.personNames,
+                  ),
+                  const SizedBox(height: 12),
                   Text(
-                    'Inputs (von Quelle → ${a.id})',
+                    'Quality Gates',
                     style: Theme.of(ctx).textTheme.titleSmall,
                   ),
+                  if (c.qualityGates.isEmpty)
+                    const Text(
+                      'Keine Quality Gates definiert — oben rechts anlegen.',
+                      style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                    ),
                   Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
-                      for (final other
-                          in c.artifacts.where((x) => x.id != a.id))
+                      for (final qg in c.qualityGates)
                         FilterChip(
-                          avatar: CircleAvatar(
-                            backgroundColor: c.typeByKey(other.type).color,
-                            radius: 8,
-                          ),
-                          label: Text(other.id),
-                          selected: inboundSel.contains(other.id),
+                          avatar: const Icon(Icons.verified_outlined, size: 16),
+                          label: Text(qg.name),
+                          selected: chosenGates.contains(qg.id),
                           onSelected: (v) => setLocal(
                             () => v
-                                ? inboundSel.add(other.id)
-                                : inboundSel.remove(other.id),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Outputs (${a.id} → Ziel)',
-                    style: Theme.of(ctx).textTheme.titleSmall,
-                  ),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final other
-                          in c.artifacts.where((x) => x.id != a.id))
-                        FilterChip(
-                          avatar: CircleAvatar(
-                            backgroundColor: c.typeByKey(other.type).color,
-                            radius: 8,
-                          ),
-                          label: Text(other.id),
-                          selected: outboundSel.contains(other.id),
-                          onSelected: (v) => setLocal(
-                            () => v
-                                ? outboundSel.add(other.id)
-                                : outboundSel.remove(other.id),
+                                ? chosenGates.add(qg.id)
+                                : chosenGates.remove(qg.id),
                           ),
                         ),
                     ],
@@ -267,9 +250,10 @@ Future<void> showEditArtifactDialog(
                             a.date = date;
                             a.bandIds = chosenBands.toList();
                             a.eventIds = chosenEvents.toList();
+                            a.qualityGateIds = chosenGates.toList();
+                            a.todos = todos;
                             a.klar = klar;
                             a.liegtVor = liegtVor;
-                            c.applyIOSelections(a, inboundSel, outboundSel);
                           });
                           Navigator.pop(ctx);
                         },

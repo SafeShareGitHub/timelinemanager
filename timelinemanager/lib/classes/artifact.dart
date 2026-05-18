@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timelinemanager/classes/todo.dart';
 
 class ArtifactType {
   String key;
@@ -23,6 +24,8 @@ class Artifact {
   List<String> outputs; // outbound selections
   List<String> bandIds; // phases
   List<String> eventIds; // milestones
+  List<String> qualityGateIds; // assigned quality gates
+  List<TodoItem> todos; // to-dos attached to this artifact
 
   /// new fields
   bool klar;
@@ -48,6 +51,8 @@ class Artifact {
     List<String>? outputs,
     List<String>? bandIds,
     List<String>? eventIds,
+    List<String>? qualityGateIds,
+    List<TodoItem>? todos,
     this.klar = false,
     this.liegtVor = false,
     List<String>? linkedFiles,
@@ -56,6 +61,8 @@ class Artifact {
        outputs = outputs ?? [],
        bandIds = bandIds ?? [],
        eventIds = eventIds ?? [],
+       qualityGateIds = qualityGateIds ?? [],
+       todos = todos ?? [],
        linkedFiles = linkedFiles ?? [];
 
   Map<String, dynamic> toJson() => {
@@ -71,6 +78,8 @@ class Artifact {
     'outputs': outputs,
     'bandIds': bandIds,
     'eventIds': eventIds,
+    'qualityGateIds': qualityGateIds,
+    'todos': todos.map((t) => t.toJson()).toList(),
     'klar': klar,
     'liegtVor': liegtVor,
     'linkedFiles': linkedFiles,
@@ -89,6 +98,13 @@ class Artifact {
     outputs: (j['outputs'] as List?)?.map((e) => e.toString()).toList() ?? [],
     bandIds: (j['bandIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
     eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
+    qualityGateIds:
+        (j['qualityGateIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
+    todos:
+        (j['todos'] as List?)
+            ?.map((e) => TodoItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList() ??
+        [],
     klar: j['klar'] ?? false,
     liegtVor: j['liegtVor'] ?? false,
     linkedFiles: _readLinkedFiles(j),

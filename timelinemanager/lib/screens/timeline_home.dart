@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timelinemanager/platform/lifecycle.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
+import 'package:timelinemanager/widgets/global_todo_panel.dart';
 import 'package:timelinemanager/widgets/legend_bar.dart';
 import 'package:timelinemanager/widgets/timeline_app_bar.dart';
 import 'package:timelinemanager/widgets/timeline_canvas.dart';
@@ -43,7 +44,14 @@ class _TimelineHomeState extends State<TimelineHome> {
         children: [
           TimelineToolbar(controller: _controller),
           const SizedBox(height: 8),
-          Expanded(child: TimelineCanvas(controller: _controller)),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(child: TimelineCanvas(controller: _controller)),
+                GlobalTodoPanel(controller: _controller),
+              ],
+            ),
+          ),
           LegendBar(controller: _controller),
         ],
       ),

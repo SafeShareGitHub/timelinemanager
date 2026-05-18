@@ -2,9 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:timelinemanager/classes/artifact.dart';
+import 'package:timelinemanager/classes/todo.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
 import 'package:timelinemanager/utils/date_utils.dart';
 import 'package:timelinemanager/widgets/linked_files_field.dart';
+import 'package:timelinemanager/widgets/person_autocomplete_field.dart';
+import 'package:timelinemanager/widgets/todo_list_editor.dart';
 import 'package:timelinemanager/widgets/type_dropdown.dart';
 
 Future<void> showNewArtifactDialog(
@@ -21,9 +24,8 @@ Future<void> showNewArtifactDialog(
   DateTime date = DateTime.now();
   final chosenBands = <String>{};
   final chosenEvents = <String>{};
-
-  final inboundSel = <String>{};
-  final outboundSel = <String>{};
+  final chosenGates = <String>{};
+  final todos = <TodoItem>[];
 
   bool klar = false;
   bool liegtVor = false;
@@ -67,8 +69,9 @@ Future<void> showNewArtifactDialog(
                     ),
                   ],
                 ),
-                TextField(
+                PersonAutocompleteField(
                   controller: ownerC,
+                  options: c.personNames,
                   decoration: const InputDecoration(
                     labelText: 'Ansprechpartner',
                   ),
@@ -105,51 +108,34 @@ Future<void> showNewArtifactDialog(
                   contentPadding: EdgeInsets.zero,
                 ),
                 const Divider(height: 18),
+                TodoListEditor(
+                  todos: todos,
+                  setLocal: setLocal,
+                  personNames: c.personNames,
+                ),
+                const Divider(height: 18),
                 Text(
-                  'Inputs (wählen → Link von Quelle → dieses Artefakt)',
+                  'Quality Gates',
                   style: Theme.of(ctx).textTheme.titleSmall,
                 ),
+                if (c.qualityGates.isEmpty)
+                  const Text(
+                    'Keine Quality Gates definiert — oben rechts anlegen.',
+                    style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12),
+                  ),
                 Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    for (final a in c.artifacts)
+                    for (final qg in c.qualityGates)
                       FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: c.typeByKey(a.type).color,
-                          radius: 8,
-                        ),
-                        label: Text(a.id),
-                        selected: inboundSel.contains(a.id),
+                        avatar: const Icon(Icons.verified_outlined, size: 16),
+                        label: Text(qg.name),
+                        selected: chosenGates.contains(qg.id),
                         onSelected: (v) => setLocal(
                           () => v
-                              ? inboundSel.add(a.id)
-                              : inboundSel.remove(a.id),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Outputs (wählen → Link von diesem Artefakt → Ziel)',
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (final a in c.artifacts)
-                      FilterChip(
-                        avatar: CircleAvatar(
-                          backgroundColor: c.typeByKey(a.type).color,
-                          radius: 8,
-                        ),
-                        label: Text(a.id),
-                        selected: outboundSel.contains(a.id),
-                        onSelected: (v) => setLocal(
-                          () => v
-                              ? outboundSel.add(a.id)
-                              : outboundSel.remove(a.id),
+                              ? chosenGates.add(qg.id)
+                              : chosenGates.remove(qg.id),
                         ),
                       ),
                   ],
@@ -236,13 +222,13 @@ Future<void> showNewArtifactDialog(
                 notes: notesC.text.trim(),
                 bandIds: chosenBands.toList(),
                 eventIds: chosenEvents.toList(),
-                inputs: inboundSel.toList(),
-                outputs: outboundSel.toList(),
+                qualityGateIds: chosenGates.toList(),
+                todos: todos,
                 klar: klar,
                 liegtVor: liegtVor,
                 linkedFiles: readLinkedFileControllers(fileCs),
               );
-              c.addArtifact(newArt, inboundSel, outboundSel);
+              c.addArtifact(newArt, const <String>{}, const <String>{});
               Navigator.pop(ctx);
             },
             child: const Text('Anlegen'),

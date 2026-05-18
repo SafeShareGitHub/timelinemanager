@@ -4,8 +4,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:timelinemanager/classes/artifact.dart';
 import 'package:timelinemanager/classes/link.dart';
+import 'package:timelinemanager/classes/person.dart';
+import 'package:timelinemanager/classes/qualitygate.dart';
 import 'package:timelinemanager/classes/timeEvent.dart';
 import 'package:timelinemanager/classes/timeband.dart';
+import 'package:timelinemanager/classes/todo.dart';
 import 'package:timelinemanager/platform/external_open.dart';
 import 'package:timelinemanager/platform/session_store.dart';
 import 'package:timelinemanager/state/filter_types.dart';
@@ -26,8 +29,27 @@ class TimelineController extends ChangeNotifier {
   // ---------------- Data ----------------
   String timelineTitle = kDefaultTimelineTitle;
 
+  /// Second, free-text part of the heading shown next to [timelineTitle]
+  /// in the app bar, with copy-to-clipboard and open-link affordances.
+  String timelineSubtitle = '';
+
+  /// Optional web link associated with the heading. Opened directly when
+  /// the user clicks the link icon in the app bar.
+  String timelineLink = '';
+
   final List<Artifact> artifacts = [];
   final List<Link> links = [];
+
+  /// Org chart entries. Their names feed the auto-suggest in artifact
+  /// owner/assignee fields.
+  final List<Person> people = [];
+
+  /// User-defined quality gates. Artifacts reference them by id.
+  final List<QualityGate> qualityGates = [];
+
+  /// Project-level to-dos that are not attached to any artifact. Shown in
+  /// the global to-do panel alongside the artifact to-dos.
+  final List<TodoItem> globalTodos = [];
   final List<ArtifactType> artifactTypes = [
     ArtifactType('Requirement', const Color(0xFF2563EB)),
     ArtifactType('Spec', const Color(0xFF7C3AED)),
@@ -300,6 +322,8 @@ class TimelineController extends ChangeNotifier {
   // ---------------- History ----------------
   String serialize() => jsonEncode({
     'title': timelineTitle,
+    'subtitle': timelineSubtitle,
+    'link': timelineLink,
     'origin': origin.toIso8601String(),
     'endDate': endDate.toIso8601String(),
     'pxPerDay': pxPerDay,
@@ -308,6 +332,9 @@ class TimelineController extends ChangeNotifier {
     'links': links.map((l) => l.toJson()).toList(),
     'bands': bands.map((b) => b.toJson()).toList(),
     'events': events.map((e) => e.toJson()).toList(),
+    'people': people.map((p) => p.toJson()).toList(),
+    'qualityGates': qualityGates.map((q) => q.toJson()).toList(),
+    'globalTodos': globalTodos.map((t) => t.toJson()).toList(),
     'bandStackMode': bandStackMode,
     'bandOpacity': bandOpacity,
     'bandRowHeight': bandRowHeight,
@@ -325,6 +352,8 @@ class TimelineController extends ChangeNotifier {
   void restore(String jsonStr) {
     final map = jsonDecode(jsonStr) as Map<String, dynamic>;
     timelineTitle = map['title'] ?? kDefaultTimelineTitle;
+    timelineSubtitle = map['subtitle'] ?? '';
+    timelineLink = map['link'] ?? '';
     origin = DateTime.parse(map['origin']);
     endDate = DateTime.parse(map['endDate']);
     pxPerDay = (map['pxPerDay'] as num).toDouble();
@@ -361,6 +390,27 @@ class TimelineController extends ChangeNotifier {
       ..addAll(
         ((map['events'] as List?) ?? []).map(
           (e) => TimeEvent.fromJson(Map<String, dynamic>.from(e)),
+        ),
+      );
+    people
+      ..clear()
+      ..addAll(
+        ((map['people'] as List?) ?? []).map(
+          (e) => Person.fromJson(Map<String, dynamic>.from(e)),
+        ),
+      );
+    qualityGates
+      ..clear()
+      ..addAll(
+        ((map['qualityGates'] as List?) ?? []).map(
+          (e) => QualityGate.fromJson(Map<String, dynamic>.from(e)),
+        ),
+      );
+    globalTodos
+      ..clear()
+      ..addAll(
+        ((map['globalTodos'] as List?) ?? []).map(
+          (e) => TodoItem.fromJson(Map<String, dynamic>.from(e)),
         ),
       );
     bandStackMode = map['bandStackMode'] ?? false;
@@ -496,6 +546,11 @@ class TimelineController extends ChangeNotifier {
     links.clear();
     bands.clear();
     events.clear();
+    people.clear();
+    qualityGates.clear();
+    globalTodos.clear();
+    timelineSubtitle = '';
+    timelineLink = '';
     artifactTypes
       ..clear()
       ..addAll([
@@ -767,7 +822,8 @@ class TimelineController extends ChangeNotifier {
 
   bool visibleArtifact(Artifact a) {
     final typeOk = typeFilter == null || a.type == typeFilter;
-    final text = '${a.name} ${a.owner} ${a.documentId}'.toLowerCase();
+    final qgText = a.qualityGateIds.map(qualityGateName).join(' ');
+    final text = '${a.name} ${a.owner} ${a.documentId} $qgText'.toLowerCase();
     final searchOk = search.isEmpty || text.contains(search.toLowerCase());
     bool filterOk = true;
     switch (artifactFilter) {
@@ -911,6 +967,38 @@ class TimelineController extends ChangeNotifier {
     timelineTitle = title.trim().isEmpty ? kDefaultTimelineTitle : title.trim();
     notifyListeners();
     pushHistory();
+  }
+
+  void setTimelineSubtitle(String subtitle) {
+    final next = subtitle.trim();
+    if (timelineSubtitle == next) return;
+    timelineSubtitle = next;
+    notifyListeners();
+    pushHistory();
+  }
+
+  void setTimelineLink(String link) {
+    final next = link.trim();
+    if (timelineLink == next) return;
+    timelineLink = next;
+    notifyListeners();
+    pushHistory();
+  }
+
+  /// Name of a quality gate by id, or '' when unknown.
+  String qualityGateName(String id) =>
+      qualityGates.firstWhereOrNull((q) => q.id == id)?.name ?? '';
+
+  /// Distinct, non-empty person names — feeds the owner/assignee
+  /// auto-suggest.
+  List<String> get personNames {
+    final seen = <String>{};
+    final out = <String>[];
+    for (final p in people) {
+      final n = p.name.trim();
+      if (n.isNotEmpty && seen.add(n.toLowerCase())) out.add(n);
+    }
+    return out;
   }
 
   void setTimeRange(DateTime start, DateTime end) {
