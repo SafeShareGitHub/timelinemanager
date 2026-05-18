@@ -64,7 +64,11 @@ SessionData? _parseSession(String raw) {
       .toList(growable: false);
   if (projects.isEmpty) return null;
   final idx = (map['currentIndex'] as num?)?.toInt() ?? 0;
-  return SessionData(idx.clamp(0, projects.length - 1), projects);
+  return SessionData(
+    idx.clamp(0, projects.length - 1),
+    projects,
+    basePath: (map['basePath'] as String?) ?? '',
+  );
 }
 
 /// Persists [data] atomically-ish: write to a sibling .tmp then rename, so
@@ -130,6 +134,7 @@ List<SnapshotEntry> listSnapshots() {
 String _encodeSession(SessionData data) => jsonEncode({
   'version': 1,
   'currentIndex': data.currentIndex,
+  'basePath': data.basePath,
   'projects': data.projects.map((p) => p.toJson()).toList(),
 });
 

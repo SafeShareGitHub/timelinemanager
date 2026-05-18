@@ -3,6 +3,7 @@ import 'package:timelinemanager/classes/artifact.dart';
 import 'package:timelinemanager/dialogues/editlink.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
 import 'package:timelinemanager/utils/date_utils.dart';
+import 'package:timelinemanager/widgets/linked_files_field.dart';
 import 'package:timelinemanager/widgets/type_dropdown.dart';
 
 Future<void> showEditArtifactDialog(
@@ -14,6 +15,7 @@ Future<void> showEditArtifactDialog(
   final ownerC = TextEditingController(text: a.owner);
   final docC = TextEditingController(text: a.documentId);
   final notesC = TextEditingController(text: a.notes);
+  final fileCs = makeLinkedFileControllers(a.linkedFiles);
   String type = a.type;
   DateTime date = a.date;
   final chosenBands = a.bandIds.toSet();
@@ -87,6 +89,12 @@ Future<void> showEditArtifactDialog(
                     controller: notesC,
                     maxLines: 3,
                     decoration: const InputDecoration(labelText: 'Notizen'),
+                  ),
+                  const SizedBox(height: 12),
+                  LinkedFilesField(
+                    controllers: fileCs,
+                    setLocal: setLocal,
+                    c: c,
                   ),
                   const SizedBox(height: 12),
                   CheckboxListTile(
@@ -255,6 +263,7 @@ Future<void> showEditArtifactDialog(
                             a.owner = ownerC.text.trim();
                             a.documentId = docC.text.trim();
                             a.notes = notesC.text.trim();
+                            a.linkedFiles = readLinkedFileControllers(fileCs);
                             a.date = date;
                             a.bandIds = chosenBands.toList();
                             a.eventIds = chosenEvents.toList();

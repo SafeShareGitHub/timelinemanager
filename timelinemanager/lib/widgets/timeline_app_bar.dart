@@ -8,6 +8,7 @@ import 'package:timelinemanager/dialogues/managebands.dart';
 import 'package:timelinemanager/dialogues/manageevents.dart';
 import 'package:timelinemanager/dialogues/managetypes.dart';
 import 'package:timelinemanager/dialogues/sessionrestore.dart';
+import 'package:timelinemanager/dialogues/settings.dart';
 import 'package:timelinemanager/dialogues/yearfilter.dart';
 import 'package:timelinemanager/platform/session_store.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
@@ -189,6 +190,11 @@ class _TimelineAppBarState extends State<TimelineAppBar> {
           icon: const Icon(Icons.upload),
         ),
         const SizedBox(width: 12),
+        IconButton(
+          tooltip: 'Einstellungen',
+          onPressed: () => showSettingsDialog(context, c),
+          icon: const Icon(Icons.settings),
+        ),
         IconButton(
           tooltip: 'Snapshot von heute speichern',
           onPressed:

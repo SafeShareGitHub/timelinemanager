@@ -20,7 +20,11 @@ SessionData? parseSessionFromJson(String text) {
         .toList(growable: false);
     if (projects.isEmpty) return null;
     final idx = (map['currentIndex'] as num?)?.toInt() ?? 0;
-    return SessionData(idx.clamp(0, projects.length - 1), projects);
+    return SessionData(
+      idx.clamp(0, projects.length - 1),
+      projects,
+      basePath: (map['basePath'] as String?) ?? '',
+    );
   } catch (_) {
     return null;
   }

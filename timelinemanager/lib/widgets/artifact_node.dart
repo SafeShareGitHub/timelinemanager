@@ -13,6 +13,101 @@ class ArtifactNode extends StatelessWidget {
     required this.artifact,
   });
 
+  Future<void> _showContextMenu(
+    BuildContext context,
+    TimelineController c,
+    Artifact a,
+    Offset globalPosition,
+  ) async {
+    final files = a.linkedFiles
+        .map((f) => f.trim())
+        .where((f) => f.isNotEmpty)
+        .toList();
+    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: [
+        if (files.isEmpty)
+          const PopupMenuItem(
+            value: 'open',
+            enabled: false,
+            child: Row(
+              children: [
+                Icon(Icons.open_in_new, size: 18),
+                SizedBox(width: 8),
+                Text('Datei öffnen (keine verknüpft)'),
+              ],
+            ),
+          )
+        else
+          for (var i = 0; i < files.length; i++)
+            PopupMenuItem(
+              value: 'open:$i',
+              child: Row(
+                children: [
+                  const Icon(Icons.open_in_new, size: 18),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'Öffnen: ${_basename(files[i])}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: 'edit',
+          child: Row(
+            children: [
+              Icon(Icons.edit, size: 18),
+              SizedBox(width: 8),
+              Text('Bearbeiten'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'focus',
+          child: Row(
+            children: [
+              Icon(Icons.center_focus_strong, size: 18),
+              SizedBox(width: 8),
+              Text('Fokus umschalten'),
+            ],
+          ),
+        ),
+      ],
+    );
+    if (selected == null) return;
+    if (selected.startsWith('open:')) {
+      final i = int.tryParse(selected.substring('open:'.length)) ?? -1;
+      if (i < 0 || i >= files.length) return;
+      final result = await c.openArtifactFile(files[i]);
+      if (!context.mounted) return;
+      if (!result.ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.error ?? 'Öffnen fehlgeschlagen.')),
+        );
+      }
+    } else if (selected == 'edit') {
+      if (!context.mounted) return;
+      showEditArtifactDialog(context, c, a);
+    } else if (selected == 'focus') {
+      c.setFocus(c.focusArtifactId == a.id ? null : a.id);
+    }
+  }
+
+  static String _basename(String path) {
+    final cleaned = path.replaceAll('"', '');
+    final parts = cleaned.split(RegExp(r'[\\/]'));
+    return parts.isEmpty ? cleaned : parts.last;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = controller;
@@ -44,6 +139,8 @@ class ArtifactNode extends StatelessWidget {
           c.setFocus(c.focusArtifactId == a.id ? null : a.id);
         },
         onDoubleTap: () => showEditArtifactDialog(context, c, a),
+        onSecondaryTapDown: (details) =>
+            _showContextMenu(context, c, a, details.globalPosition),
         onPanStart: (_) => c.startDrag(a.id, basePos),
         onPanUpdate: (d) {
           final prev = c.dragPosOverride[a.id] ?? basePos;

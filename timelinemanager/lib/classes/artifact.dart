@@ -28,6 +28,13 @@ class Artifact {
   bool klar;
   bool liegtVor;
 
+  /// Zero or more linked documents. Each entry is an absolute path
+  /// (`C:\…\file.xlsm`) or a filename / relative path that gets the
+  /// controller's `basePath` prepended at open time. Surrounding quotes
+  /// (as Windows' "Copy as path" produces) are tolerated and stripped on
+  /// open.
+  List<String> linkedFiles;
+
   Artifact({
     String? id, // optional, wird generiert wenn null
     required this.name,
@@ -43,11 +50,13 @@ class Artifact {
     List<String>? eventIds,
     this.klar = false,
     this.liegtVor = false,
+    List<String>? linkedFiles,
   }) : id = id ?? UniqueKey().toString(),
        inputs = inputs ?? [],
        outputs = outputs ?? [],
        bandIds = bandIds ?? [],
-       eventIds = eventIds ?? [];
+       eventIds = eventIds ?? [],
+       linkedFiles = linkedFiles ?? [];
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -64,6 +73,7 @@ class Artifact {
     'eventIds': eventIds,
     'klar': klar,
     'liegtVor': liegtVor,
+    'linkedFiles': linkedFiles,
   };
 
   static Artifact fromJson(Map<String, dynamic> j) => Artifact(
@@ -81,5 +91,19 @@ class Artifact {
     eventIds: (j['eventIds'] as List?)?.map((e) => e.toString()).toList() ?? [],
     klar: j['klar'] ?? false,
     liegtVor: j['liegtVor'] ?? false,
+    linkedFiles: _readLinkedFiles(j),
   );
+
+  static List<String> _readLinkedFiles(Map<String, dynamic> j) {
+    final list = j['linkedFiles'];
+    if (list is List) {
+      return list
+          .map((e) => e.toString())
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+    }
+    // Backwards-compat: earlier versions stored a single 'linkedFile'.
+    final single = (j['linkedFile'] as String?)?.trim() ?? '';
+    return single.isEmpty ? [] : [single];
+  }
 }

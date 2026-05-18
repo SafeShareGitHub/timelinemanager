@@ -6,6 +6,7 @@ import 'package:timelinemanager/classes/artifact.dart';
 import 'package:timelinemanager/classes/link.dart';
 import 'package:timelinemanager/classes/timeEvent.dart';
 import 'package:timelinemanager/classes/timeband.dart';
+import 'package:timelinemanager/platform/external_open.dart';
 import 'package:timelinemanager/platform/session_store.dart';
 import 'package:timelinemanager/state/filter_types.dart';
 import 'package:timelinemanager/utils/iterable_ext.dart';
@@ -91,6 +92,52 @@ class TimelineController extends ChangeNotifier {
       _projects.map((p) => p.title).toList(growable: false);
   bool get canDeleteCurrentProject => _projects.length > 1;
 
+  // ---------------- Machine-local settings ----------------
+  /// Prepended to relative `linkedFile` entries when opening external
+  /// documents. Persisted in session.json (top-level, not per project) so
+  /// each user keeps their own path even when sharing a session.
+  String basePath = '';
+
+  void setBasePath(String value) {
+    final next = stripPathQuotes(value);
+    if (basePath == next) return;
+    basePath = next;
+    _scheduleAutosave();
+    notifyListeners();
+  }
+
+  /// Removes leading/trailing whitespace and a single layer of wrapping
+  /// double quotes — Windows' "Copy as path" hands you `"C:\…\x.docx"`.
+  static String stripPathQuotes(String raw) {
+    var s = raw.trim();
+    if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) {
+      s = s.substring(1, s.length - 1).trim();
+    }
+    return s;
+  }
+
+  /// Combines [basePath] with a linked-file entry. Strips wrapping quotes
+  /// first, then returns the path unchanged if it already looks absolute
+  /// (Windows drive letter or UNC, or starts with `/`).
+  String resolveLinkedFile(String linkedFile) {
+    final raw = stripPathQuotes(linkedFile);
+    if (raw.isEmpty) return '';
+    final isAbsolute =
+        raw.startsWith(RegExp(r'^[a-zA-Z]:[\\/]')) ||
+        raw.startsWith(r'\\') ||
+        raw.startsWith('/');
+    if (isAbsolute || basePath.isEmpty) return raw;
+    final prefix = basePath.endsWith(r'\') || basePath.endsWith('/')
+        ? basePath
+        : '$basePath\\';
+    return '$prefix$raw';
+  }
+
+  /// Convenience: resolve + shell-open. Returns the OS result so callers
+  /// can surface failures (file missing, etc).
+  Future<ExternalOpenResult> openArtifactFile(String linkedFile) =>
+      openExternally(resolveLinkedFile(linkedFile));
+
   // ---------------- Autosave ----------------
   Timer? _autosaveTimer;
   static const Duration _autosaveDebounce = Duration(milliseconds: 800);
@@ -98,6 +145,7 @@ class TimelineController extends ChangeNotifier {
   TimelineController() {
     final session = readSessionSync();
     if (session != null && session.projects.isNotEmpty) {
+      basePath = session.basePath;
       for (final p in session.projects) {
         _projects.add(_ProjectSlot(p.title, p.dataJson));
       }
@@ -544,6 +592,7 @@ class TimelineController extends ChangeNotifier {
       _projects
           .map((p) => SessionProject(p.title, p.dataJson))
           .toList(growable: false),
+      basePath: basePath,
     );
   }
 

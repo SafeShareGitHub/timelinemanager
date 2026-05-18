@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:timelinemanager/classes/artifact.dart';
 import 'package:timelinemanager/state/timeline_controller.dart';
 import 'package:timelinemanager/utils/date_utils.dart';
+import 'package:timelinemanager/widgets/linked_files_field.dart';
 import 'package:timelinemanager/widgets/type_dropdown.dart';
 
 Future<void> showNewArtifactDialog(
@@ -15,6 +16,7 @@ Future<void> showNewArtifactDialog(
   final ownerC = TextEditingController();
   final docC = TextEditingController();
   final notesC = TextEditingController();
+  final fileCs = <TextEditingController>[];
   String type = c.artifactTypes.isNotEmpty ? c.artifactTypes.first.key : 'Other';
   DateTime date = DateTime.now();
   final chosenBands = <String>{};
@@ -79,6 +81,13 @@ Future<void> showNewArtifactDialog(
                   controller: notesC,
                   maxLines: 3,
                   decoration: const InputDecoration(labelText: 'Notizen'),
+                ),
+                const SizedBox(height: 10),
+                LinkedFilesField(
+                  controllers: fileCs,
+                  setLocal: setLocal,
+                  c: c,
+                  showOpenButtons: false,
                 ),
                 const SizedBox(height: 10),
                 CheckboxListTile(
@@ -231,6 +240,7 @@ Future<void> showNewArtifactDialog(
                 outputs: outboundSel.toList(),
                 klar: klar,
                 liegtVor: liegtVor,
+                linkedFiles: readLinkedFileControllers(fileCs),
               );
               c.addArtifact(newArt, inboundSel, outboundSel);
               Navigator.pop(ctx);

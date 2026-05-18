@@ -13,12 +13,18 @@ class SessionProject {
       SessionProject(j['title'] as String, j['data'] as String);
 }
 
-/// Everything we restore on app boot: the project list and which one was
-/// active. Stored on disk at the platform-specific session path.
+/// Everything we restore on app boot: the project list, which one was
+/// active, and machine-local settings. Stored on disk at the
+/// platform-specific session path.
 class SessionData {
   final int currentIndex;
   final List<SessionProject> projects;
-  const SessionData(this.currentIndex, this.projects);
+
+  /// Machine-local prefix for resolving relative `linkedFile` paths on
+  /// artifacts (e.g. `C:\\SmarTeam\\Work\\`). Empty string means "no
+  /// prefix; only absolute paths work".
+  final String basePath;
+  const SessionData(this.currentIndex, this.projects, {this.basePath = ''});
 }
 
 /// A discovered snapshot file on disk. Returned by `listSnapshots()` so the
